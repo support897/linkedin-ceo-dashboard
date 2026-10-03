@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LinkedIn CEO Dashboard</title>
+<meta name="description" content="Your LinkedIn week at a glance: posts, comments, freebies and photos.">
+<meta name="theme-color" content="#E8A8A8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-row">
+    <svg class="logo-mark" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="26" width="9" height="16" rx="2.5" fill="#1A1A2E"/><rect x="19" y="19" width="9" height="23" rx="2.5" fill="#1A1A2E"/><rect x="34" y="11" width="9" height="31" rx="2.5" fill="#1A1A2E"/><path d="M8 22 L23 14 L38 7 L44 4" stroke="#9BD3AC" stroke-width="3.4" fill="none" stroke-linecap="round"/></svg>
+    <div>
+      <h1>CEO Dashboard</h1>
+      <p class="header-sub">Your LinkedIn, at a glance</p>
+    </div>
+  </div>
+  <p class="last-updated" id="last-updated">Last updated: loading...</p>
+</header>
+
+<div id="pull-hint" class="pull-hint" hidden>Release to refresh</div>
+
+<main id="main">
+  <!-- HOME -->
+  <section id="view-home" class="view">
+    <div id="attention" class="attention" hidden></div>
+
+    <div class="card card-rose" id="this-week-card">
+      <h2>This Week</h2>
+      <p class="big-line" id="this-week-count">...</p>
+      <p class="muted" id="this-week-sub">Posts go out Mon, Wed and Fri at 10am.</p>
+    </div>
+
+    <div class="kpi-grid" id="kpi-grid">
+      <div class="card kpi" id="kpi-comments"></div>
+      <div class="card kpi" id="kpi-requests"></div>
+      <div class="card kpi" id="kpi-conversations"></div>
+      <div class="card kpi kpi-small" id="kpi-likes"></div>
+    </div>
+
+    <p class="runway" id="runway"></p>
+
+    <div class="card" id="chart-card">
+      <h2>Comments, last 8 weeks</h2>
+      <div id="chart-wrap"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card card-blue" id="best-card">
+      <h2>Best Post This Week</h2>
+      <div id="best-post"><p class="muted">Loading...</p></div>
+      <p class="fineprint">Ranked by comments + likes. Reach joins in when LinkedIn unlocks it.</p>
+    </div>
+
+    <div class="card card-mint" id="freebie-card">
+      <h2>Friday Freebie</h2>
+      <div id="freebie-summary"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card" id="reminders-card">
+      <h2>Reminders</h2>
+      <p class="muted">Get the Wednesday summary, the Friday freebie alert, and a nudge if something breaks. Nothing else, ever.</p>
+      <button class="btn btn-primary" id="btn-reminders" type="button">Turn on reminders</button>
+      <p class="fineprint" id="reminder-status"></p>
+    </div>
+  </section>
+
+  <!-- POSTS -->
+  <section id="view-posts" class="view" hidden>
+    <div class="toggle-row" role="group" aria-label="Sort posts">
+      <button class="toggle active" id="sort-newest" type="button">Newest</button>
+      <button class="toggle" id="sort-best" type="button">Best</button>
+    </div>
+    <div id="posts-list"><p class="muted pad">Loading...</p></div>
+  </section>
+
+  <!-- FREEBIES -->
+  <section id="view-freebies" class="view" hidden>
+    <div class="card card-mint">
+      <h2 id="fb-current-name">Current freebie</h2>
+      <p class="muted" id="fb-current-keyword"></p>
+      <div class="funnel" id="fb-funnel"></div>
+    </div>
+
+    <div class="card">
+      <h2>Waiting for their freebie</h2>
+      <div id="fb-waiting"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Add a request</h2>
+      <form id="fb-add-form">
+        <label class="field-label" for="fb-person">Person's name</label>
+        <input id="fb-person" type="text" autocomplete="off" placeholder="e.g. Sarah from Bloom Cafe" required>
+        <label class="field-label" for="fb-name">Freebie</label>
+        <input id="fb-name" type="text" autocomplete="off" required>
+        <label class="field-label" for="fb-keyword">Keyword they commented</label>
+        <input id="fb-keyword" type="text" autocomplete="off">
+        <button class="btn btn-primary" type="submit">Add request</button>
+        <p class="fineprint" id="fb-add-status"></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Past freebies</h2>
+      <div id="fb-past"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
+
+  <!-- PHOTOS -->
+  <section id="view-photos" class="view" hidden>
+    <div class="card">
+      <h2>Add photos of you</h2>
+      <p class="muted">Each photo is used once, then retired. Posts are never written about the photo.</p>
+      <label class="field-label" for="photo-note">Private note for you (never used in posts)</label>
+      <input id="photo-note" type="text" autocomplete="off" placeholder="Optional, just for you">
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Add photos">
+        <svg viewBox="0 0 48 48" class="dz-icon" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5" fill="#C4D4EC"/><circle cx="17" cy="20" r="3.4" fill="#FFFEFA"/><path d="M8 34 L20 24 L29 31 L34 27 L40 32 L40 38 L8 38 Z" fill="#9BD3AC"/></svg>
+        <p><strong>Tap to add photos</strong> or drag them here</p>
+        <p class="fineprint">You can pick several at once.</p>
+      </div>
+      <input id="photo-input" type="file" accept="image/*" multiple hidden>
+      <p class="fineprint" id="photo-status"></p>
+    </div>
+
+    <div class="card">
+      <h2>Ready to use <span class="count-pill" id="ready-count">0</span></h2>
+      <div id="ready-shelf" class="shelf"><p class="muted">Loading...</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Used</h2>
+      <div id="used-shelf" class="shelf"><p class="muted">Loading...</p></div>
+    </div>
+  </section>
+</main>
+
+<nav id="tabbar" aria-label="Dashboard sections">
+  <button class="tab active" data-view="home" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 22 L24 8 L40 22" stroke="#1A1A2E" stroke-width="3.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 21 V39 H35 V21" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="3" stroke-linejoin="round"/><rect x="21" y="29" width="6.5" height="10" rx="1.6" fill="#FFFEFA"/></svg>
+    <span>Home</span>
+  </button>
+  <button class="tab" data-view="posts" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="11" y="6" width="26" height="36" rx="4" fill="#C8D8E8" stroke="#1A1A2E" stroke-width="2.6"/><path d="M17 16 H31 M17 23 H31 M17 30 H26" stroke="#1A1A2E" stroke-width="3" stroke-linecap="round"/></svg>
+    <span>Posts</span>
+  </button>
+  <button class="tab" data-view="freebies" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="20" width="30" height="20" rx="3" fill="#CCECE4" stroke="#1A1A2E" stroke-width="2.6"/><path d="M24 20 V40 M9 27 H39" stroke="#1A1A2E" stroke-width="2.6"/><path d="M24 20 C17 20 13 16.5 14.5 12.5 C15.8 9.4 20 9.8 21.8 12.6 C23 14.4 24 20 24 20 Z M24 20 C31 20 35 16.5 33.5 12.5 C32.2 9.4 28 9.8 26.2 12.6 C25 14.4 24 20 24 20 Z" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="2.2"/></svg>
+    <span>Freebies</span>
+  </button>
+  <button class="tab" data-view="photos" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5" fill="#C4D4EC" stroke="#1A1A2E" stroke-width="2.4"/><circle cx="17" cy="20" r="3.4" fill="#FFFEFA"/><path d="M8 34 L20 24 L29 31 L34 27 L40 32 L40 36 Q40 38 38 38 L10 38 Q8 38 8 36 Z" fill="#9BD3AC"/></svg>
+    <span>Photos</span>
+  </button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
