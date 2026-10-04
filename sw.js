@@ -2,7 +2,7 @@
 // Supabase REST and Storage calls always go to the network so the numbers
 // on screen are fresh. Push notifications arrive here once a sender is
 // wired up (subscription groundwork lives in app.js).
-const CACHE = "ceo-dashboard-v1";
+const CACHE = "ceo-dashboard-v2";
 const SHELL = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
