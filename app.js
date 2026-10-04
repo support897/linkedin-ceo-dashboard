@@ -113,7 +113,7 @@ function renderAttention() {
   const waiting = D.requests.filter((r) => !r.sent).length;
   if (waiting > 0) items.push(`${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for a freebie. Open Freebies in the menu.`);
   const ready = D.photos.filter((p) => !p.used_at).length;
-  if (ready === 0) items.push("Photo vault is empty. Add photos in the Photos tab so personal posts keep coming.");
+  if (ready === 0) items.push("Photo vault is empty. Add photos from the Photos page in the menu so personal posts keep coming.");
   const weekAgo = addDays(brisDateStr(new Date()), -7);
   const silence = D.alerts.find((a) => a.kind === "silence" && a.ref >= weekAgo);
   if (silence) items.push(`A scheduled post may have been missed on ${esc(silence.ref)}.`);
@@ -176,7 +176,7 @@ function renderHome() {
     const untilStr = new Intl.DateTimeFormat("en-AU", { timeZone: TZ, weekday: "short", day: "numeric", month: "short" }).format(until);
     $("runway").textContent = `Photos ready: ${ready}, enough until about ${untilStr}.`;
   } else {
-    $("runway").textContent = "Photos ready: 0. Add some in the Photos tab.";
+    $("runway").textContent = "Photos ready: 0. Add some from the Photos page in the menu.";
   }
 
   renderChart();
@@ -568,7 +568,11 @@ function setSidebar(open) {
 function closeSidebar() { setSidebar(false); }
 
 function switchView(name) {
-  document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== `view-${name}`; });
+  document.querySelectorAll(".view").forEach((v) => {
+    const on = v.id === `view-${name}`;
+    v.hidden = !on;
+    v.classList.toggle("active", on);
+  });
   document.querySelectorAll(".side-item").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
   closeSidebar();
   window.scrollTo({ top: 0 });
