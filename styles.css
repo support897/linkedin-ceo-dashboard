@@ -15,6 +15,11 @@
   --tint-honey: #FCF3D9;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+/* Exactly one view on screen at a time. JS toggles .active and the hidden
+   attribute together, and these rules win over anything else. */
+.view { display: none; }
+.view.active { display: block; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   font-family: "Nunito", system-ui, sans-serif;
@@ -37,11 +42,15 @@ h2 { font-size: 17px; margin-bottom: 8px; }
 }
 .header-row { display: flex; gap: 12px; align-items: center; }
 .menu-btn {
-  flex: 0 0 auto; width: 46px; height: 46px; padding: 9px;
-  background: rgba(255,254,250,.55); border: 2px solid var(--ink); border-radius: 13px;
-  cursor: pointer; color: var(--ink);
+  flex: 0 0 auto; width: 48px; height: 48px; padding: 0;
+  background: var(--cream); border: 2px solid var(--ink); border-radius: 13px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
 }
-.menu-btn svg { width: 100%; height: 100%; display: block; }
+.menu-btn .bar {
+  display: block; width: 24px; height: 4px; border-radius: 2px;
+  background: var(--ink);
+}
 .menu-btn:active { transform: scale(.96); }
 .logo-mark { width: 44px; height: 44px; flex: 0 0 auto; }
 .app-header h1 { font-size: 22px; }
@@ -181,17 +190,23 @@ input[type="text"]:focus { outline: 2px solid var(--peri); border-color: var(--p
   box-shadow: 6px 0 24px rgba(26,26,46,.18);
   padding: 116px 14px 16px;
   transform: translateX(-106%);
-  transition: transform .28s ease;
+  visibility: hidden;
+  transition: transform .28s ease, visibility 0s linear .28s;
   overflow-y: auto;
 }
-#sidebar.open { transform: translateX(0); }
+#sidebar.open {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform .28s ease, visibility 0s;
+}
 .side-title {
   font-family: "Quicksand", sans-serif; font-weight: 700; font-size: 12.5px;
   text-transform: uppercase; letter-spacing: .5px; color: rgba(26,26,46,.55);
   margin: 0 6px 10px;
 }
 .side-item {
-  display: flex; align-items: center; gap: 12px; width: 100%;
+  display: flex; flex-direction: row; align-items: center; gap: 12px; width: 100%;
+  min-height: 52px;
   padding: 11px 12px; margin-bottom: 6px;
   background: none; border: 2px solid transparent; border-radius: 999px;
   font-family: "Quicksand", sans-serif; font-weight: 700; font-size: 16px; color: var(--ink);
