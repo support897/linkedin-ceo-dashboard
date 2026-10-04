@@ -403,6 +403,57 @@ async function addRequest(ev) {
   }
 }
 
+// ---- PEOPLE ----
+const EMAIL_RE = /\S+@\S+\.\S+/;
+
+function renderPeople() {
+  const rows = [...D.requests].sort((a, b) => {
+    if (a.requested_on !== b.requested_on) return String(a.requested_on) < String(b.requested_on) ? 1 : -1;
+    return (b.id || 0) - (a.id || 0);
+  });
+  const emails = new Set(
+    rows.map((r) => String(r.person_name || "").trim().toLowerCase()).filter((v) => EMAIL_RE.test(v))
+  );
+  $("people-summary").textContent = `People: ${rows.length} requests \u00B7 ${emails.size} email addresses`;
+  const list = $("people-list");
+  if (!rows.length) {
+    list.innerHTML = `<div class="card"><p class="muted">No people yet. Emails land here the moment someone grabs a freebie.</p></div>`;
+    return;
+  }
+  list.innerHTML = rows.map((r) => {
+    const name = r.person_name || "";
+    const status = r.sent
+      ? `<span class="chip chip-sent">Sent${r.sent_at ? " " + esc(fmtDate(brisDateStr(new Date(r.sent_at)))) : ""}</span>`
+      : `<span class="chip chip-waiting">Waiting</span>`;
+    const kw = r.keyword ? `<span class="chip">${esc(r.keyword)}</span>` : "";
+    const website = r.website ? `<p class="person-line">Website: ${esc(r.website)}</p>` : "";
+    const consent = r.consent ? `<p class="person-line">Weekly tips: yes</p>` : "";
+    return `<article class="card person-card">
+      <p class="person-email" data-copy="${esc(name)}" role="button" tabindex="0" title="Tap to copy">${esc(name)}<span class="copied-tag" hidden>Copied</span></p>
+      <div class="post-meta"><span class="post-nums">${esc(r.freebie_name || "Freebie")}</span>${kw}${status}</div>
+      <p class="person-line">Asked ${esc(fmtDate(r.requested_on))}</p>
+      ${website}${consent}
+    </article>`;
+  }).join("");
+}
+
+async function copyPersonName(text, el) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+    ta.remove();
+  }
+  if (ok && el) {
+    const tag = el.querySelector(".copied-tag");
+    if (tag) { tag.hidden = false; setTimeout(() => { tag.hidden = true; }, 1200); }
+  }
+}
+
 // ---- PHOTOS ----
 function fileToJpegBlob(file) {
   return new Promise((resolve, reject) => {
@@ -507,10 +558,19 @@ async function enableReminders() {
   }
 }
 
-// ---- App shell: tabs, refresh, pull-to-refresh ----
+// ---- App shell: side menu, refresh, pull-to-refresh ----
+function setSidebar(open) {
+  document.body.classList.toggle("menu-open", open);
+  $("sidebar").classList.toggle("open", open);
+  $("sidebar-backdrop").hidden = !open;
+  $("menu-btn").setAttribute("aria-expanded", open ? "true" : "false");
+}
+function closeSidebar() { setSidebar(false); }
+
 function switchView(name) {
   document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== `view-${name}`; });
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+  document.querySelectorAll(".side-item").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+  closeSidebar();
   window.scrollTo({ top: 0 });
 }
 
@@ -519,7 +579,7 @@ async function refreshData() {
   try {
     await loadAll();
     if (errBox) errBox.remove();
-    renderHome(); renderPosts(); renderFreebies(); renderPhotos();
+    renderHome(); renderPosts(); renderFreebies(); renderPeople(); renderPhotos();
   } catch (e) {
     $("last-updated").textContent = "Could not load. Pull down to try again.";
     if (!errBox) {
@@ -532,7 +592,18 @@ async function refreshData() {
 }
 
 function init() {
-  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+  document.querySelectorAll(".side-item").forEach((t) => t.addEventListener("click", () => switchView(t.dataset.view)));
+  $("menu-btn").addEventListener("click", () => setSidebar(!$("sidebar").classList.contains("open")));
+  $("sidebar-backdrop").addEventListener("click", closeSidebar);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSidebar(); });
+  $("people-list").addEventListener("click", (ev) => {
+    const el = ev.target.closest("[data-copy]");
+    if (el) copyPersonName(el.dataset.copy, el);
+  });
+  $("people-list").addEventListener("keydown", (ev) => {
+    const el = ev.target.closest("[data-copy]");
+    if (el && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); copyPersonName(el.dataset.copy, el); }
+  });
   $("sort-newest").addEventListener("click", () => { sortMode = "newest"; $("sort-newest").classList.add("active"); $("sort-best").classList.remove("active"); renderPosts(); });
   $("sort-best").addEventListener("click", () => { sortMode = "best"; $("sort-best").classList.add("active"); $("sort-newest").classList.remove("active"); renderPosts(); });
   $("fb-waiting").addEventListener("click", (ev) => {
