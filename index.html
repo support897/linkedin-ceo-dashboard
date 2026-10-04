@@ -12,14 +12,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 
 <header class="app-header">
   <div class="header-row">
     <button id="menu-btn" class="menu-btn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="sidebar">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M9 14 H39 M9 24 H39 M9 34 H39" stroke="#1A1A2E" stroke-width="4.4" stroke-linecap="round" fill="none"/></svg>
+      <span class="bar"></span><span class="bar"></span><span class="bar"></span>
     </button>
     <svg class="logo-mark" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="26" width="9" height="16" rx="2.5" fill="#1A1A2E"/><rect x="19" y="19" width="9" height="23" rx="2.5" fill="#1A1A2E"/><rect x="34" y="11" width="9" height="31" rx="2.5" fill="#1A1A2E"/><path d="M8 22 L23 14 L38 7 L44 4" stroke="#9BD3AC" stroke-width="3.4" fill="none" stroke-linecap="round"/></svg>
     <div>
@@ -59,7 +59,7 @@
 
 <main id="main">
   <!-- HOME -->
-  <section id="view-home" class="view">
+  <section id="view-home" class="view active">
     <div id="attention" class="attention" hidden></div>
 
     <div class="card card-rose" id="this-week-card">
@@ -180,6 +180,6 @@
   </section>
 </main>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
