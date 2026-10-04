@@ -111,7 +111,7 @@ function compareLine(cur, avg) {
 function renderAttention() {
   const items = [];
   const waiting = D.requests.filter((r) => !r.sent).length;
-  if (waiting > 0) items.push(`${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for a freebie. See the Freebies tab.`);
+  if (waiting > 0) items.push(`${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for a freebie. Open Freebies in the menu.`);
   const ready = D.photos.filter((p) => !p.used_at).length;
   if (ready === 0) items.push("Photo vault is empty. Add photos in the Photos tab so personal posts keep coming.");
   const weekAgo = addDays(brisDateStr(new Date()), -7);
@@ -261,7 +261,7 @@ function renderFreebieCard() {
   }
   const waiting = D.requests.filter((r) => r.freebie_name === cur.name && !r.sent).length;
   box.innerHTML = `<p class="best-text"><strong>${esc(cur.name)}</strong></p>
-    <p class="muted">Keyword: <strong>${esc(cur.keyword || "-")}</strong>${waiting ? `<br>${waiting} ${waiting === 1 ? "person" : "people"} waiting. See the Freebies tab.` : "<br>Nobody waiting right now."}</p>`;
+    <p class="muted">Keyword: <strong>${esc(cur.keyword || "-")}</strong>${waiting ? `<br>${waiting} ${waiting === 1 ? "person" : "people"} waiting. See the waiting list below.` : "<br>Nobody waiting right now."}</p>`;
 }
 
 async function logConversation() {
