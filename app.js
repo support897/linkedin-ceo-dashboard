@@ -51,7 +51,7 @@ function fmtNum(n) {
 }
 
 // ---- State ----
-const D = { posts: [], stats: [], requests: [], photos: [], conversations: [], alerts: [] };
+const D = { posts: [], stats: [], requests: [], photos: [], conversations: [], alerts: [], leads: [], events: [] };
 let latestStats = {}; // urn -> newest snapshot
 let sortMode = "newest";
 
@@ -69,7 +69,9 @@ async function loadAll() {
     requests: sb("li_freebie_requests?select=*&order=id.desc&limit=500"),
     photos: sb("li_vault_photos?select=*&order=uploaded_at.asc&limit=500"),
     conversations: sb("li_conversations?select=*&order=logged_on.desc&limit=500"),
-    alerts: sb("li_alerts?select=*&order=id.desc&limit=20")
+    alerts: sb("li_alerts?select=*&order=id.desc&limit=20"),
+    leads: sb("li_outreach_leads?select=*&order=lead_score.desc.nullslast,created_at.desc&limit=1000"),
+    events: sb("li_outreach_events?select=*&order=happened_on.desc,id.desc&limit=2000")
   };
   const keys = Object.keys(jobs);
   const results = await Promise.allSettled(keys.map((k) => jobs[k]));
@@ -111,16 +113,24 @@ function compareLine(cur, avg) {
 function renderAttention() {
   const items = [];
   const waiting = D.requests.filter((r) => !r.sent).length;
-  if (waiting > 0) items.push(`${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for a freebie. Open Freebies in the menu.`);
+  if (waiting > 0) items.push({ t: `${waiting} ${waiting === 1 ? "person is" : "people are"} waiting for a freebie. Open Freebies in the menu.` });
   const ready = D.photos.filter((p) => !p.used_at).length;
-  if (ready === 0) items.push("Photo vault is empty. Add photos from the Photos page in the menu so personal posts keep coming.");
+  if (ready === 0) items.push({ t: "Photo vault is empty. Add photos from the Photos page in the menu so personal posts keep coming." });
   const weekAgo = addDays(brisDateStr(new Date()), -7);
   const silence = D.alerts.find((a) => a.kind === "silence" && a.ref >= weekAgo);
-  if (silence) items.push(`A scheduled post may have been missed on ${esc(silence.ref)}.`);
+  if (silence) items.push({ t: `A scheduled post may have been missed on ${esc(silence.ref)}.` });
+  // Outreach: what needs a human today
+  const due = dueItems();
+  const replies = due.filter((d) => d.lead.stage === "replied").length;
+  const steps = due.length - replies;
+  if (replies > 0) items.push({ t: `${replies} ${replies === 1 ? "reply is" : "replies are"} waiting for your answer.`, g: "due" });
+  if (steps > 0) items.push({ t: `${steps} outreach ${steps === 1 ? "step is" : "steps are"} due today.`, g: "due" });
+  const st = safetyStatus();
+  if (st.label === "Stop") items.push({ t: `Outreach safety says STOP: ${st.why}`, g: "safety" });
   const box = $("attention");
   if (!items.length) { box.hidden = true; box.innerHTML = ""; return; }
   box.hidden = false;
-  box.innerHTML = `<h2><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 6 L45 40 H3 Z" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="3" stroke-linejoin="round"/><rect x="22" y="19" width="4.5" height="11" fill="#1A1A2E"/><circle cx="24.2" cy="35" r="2.4" fill="#1A1A2E"/></svg>Needs your attention</h2><ul>${items.map((i) => `<li>${i}</li>`).join("")}</ul>`;
+  box.innerHTML = `<h2><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 6 L45 40 H3 Z" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="3" stroke-linejoin="round"/><rect x="22" y="19" width="4.5" height="11" fill="#1A1A2E"/><circle cx="24.2" cy="35" r="2.4" fill="#1A1A2E"/></svg>Needs your attention</h2><ul>${items.map((i) => `<li${i.g ? ` data-goto="${i.g}" role="button" tabindex="0"` : ""}>${i.t}</li>`).join("")}</ul>`;
 }
 
 function kpiCard(id, label, valueHtml, subHtml, extra = "") {
@@ -276,6 +286,258 @@ async function logConversation() {
     if (status) status.textContent = "Could not save. Try again in a moment.";
     btn.disabled = false;
   }
+}
+
+// ---- OUTREACH ----
+const TERMINAL_STAGES = ["won", "not_now", "closed"];
+const STAGE_LABELS = { new: "New lead", followed: "Followed, warming up", invited: "Invite sent", accepted: "Accepted", msg1_sent: "Message 1 sent", replied: "They replied", chatting: "Chatting", fu1_sent: "Follow-up 1 sent", fu2_sent: "Follow-up 2 sent", call_booked: "Call booked", won: "Won", not_now: "Not now", closed: "Closed" };
+let currentDue = [];
+
+function leadName(l) { return [l.first_name, l.last_name].filter(Boolean).join(" ").trim() || l.business || "Unnamed lead"; }
+function last7Set() { const today = brisDateStr(new Date()); const set = new Set(); for (let i = 0; i < 7; i++) set.add(addDays(today, -i)); return set; }
+function weekInvites() { const set = last7Set(); return D.leads.filter((l) => l.invite_sent_on && set.has(l.invite_sent_on)); }
+function yesRate() { const inv = weekInvites(); const acc = inv.filter((l) => l.accepted_on).length; return { sent: inv.length, acc, rate: inv.length ? acc / inv.length : null }; }
+
+function safetyStatus() {
+  const { sent, rate } = yesRate();
+  if (sent >= 100) return { label: "Stop", why: "the weekly invite budget is used up." };
+  if (sent >= 20 && rate !== null && rate < 0.25) return { label: "Stop", why: "yes-rate is under 25% in the last 7 days. Pause and fix the list or the note." };
+  if (sent >= 20 && rate !== null && rate < 0.30) return { label: "Pause", why: "yes-rate is under the 30% target. Slow down and warm leads up more." };
+  return { label: "Safe", why: sent < 20 ? "Early days. The yes-rate judges itself once 20 invites are out." : "Yes-rate is holding at or above 30%." };
+}
+function statusChip(st) {
+  if (st.label === "Safe") return `<span class="chip chip-sent">Safe</span>`;
+  if (st.label === "Pause") return `<span class="chip chip-waiting">Pause</span>`;
+  return `<span class="chip chip-stop">Stop</span>`;
+}
+
+function dueItems() {
+  const today = brisDateStr(new Date());
+  const out = [];
+  for (const l of D.leads) {
+    if (TERMINAL_STAGES.includes(l.stage)) continue;
+    if (l.stage === "replied") out.push({ lead: l, label: "Reply waiting for your answer", action: "Mark answered", patch: { stage: "chatting" } });
+    else if (l.accepted_on && !l.msg1_on) out.push({ lead: l, label: "Accepted you. Message 1 is due", action: "Mark message 1 sent", patch: { stage: "msg1_sent", msg1_on: today } });
+    else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today } });
+    else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today } });
+  }
+  currentDue = out;
+  return out;
+}
+
+function oldPending() {
+  const cutoff = addDays(brisDateStr(new Date()), -21);
+  return D.leads.filter((l) => l.invite_sent_on && !l.accepted_on && l.invite_sent_on <= cutoff && !TERMINAL_STAGES.includes(l.stage));
+}
+
+function nextStepLabel(l) {
+  const d = currentDue.find((x) => x.lead.id === l.id);
+  if (d) return d.label;
+  if (TERMINAL_STAGES.includes(l.stage)) return STAGE_LABELS[l.stage] || "Done";
+  if (l.stage === "new") return "Follow and warm up first";
+  if (l.stage === "followed") return "Send the invite on its scheduled day";
+  if (l.stage === "invited") return "Waiting for their answer";
+  if (l.stage === "accepted") return "Send message 1";
+  if (l.stage === "chatting") return "Keep the chat warm. Offer the call when it fits";
+  if (l.msg1_on && !l.fu1_on) return `Follow-up 1 on ${fmtDate(addDays(l.msg1_on, 3))}`;
+  if (l.fu1_on && !l.fu2_on && l.msg1_on) return `Follow-up 2 on ${fmtDate(addDays(l.msg1_on, 8))}`;
+  return STAGE_LABELS[l.stage] || "On track";
+}
+
+function renderOutreachHome() {
+  const box = $("outreach-summary");
+  if (!box) return;
+  const { sent, acc, rate } = yesRate();
+  const st = safetyStatus();
+  const due = currentDue;
+  $("outreach-budget-fill").style.width = `${Math.min(100, sent)}%`;
+  $("outreach-budget-label").textContent = sent >= 100 ? "Weekly invite budget used. Sending pauses until Monday." : `Weekly invite budget: ${sent} of 100 used.`;
+  const badge = $("outreach-badge");
+  if (badge) { badge.hidden = due.length === 0; badge.textContent = due.length; }
+  if (!D.leads.length) {
+    box.innerHTML = `<p class="muted">No outreach leads yet. The first approved batch lands here, with invites, yes-rate and what is due today.</p>`;
+    return;
+  }
+  const calls = D.leads.filter((l) => l.call_on).length;
+  box.innerHTML = `<p class="status-line">${statusChip(st)}<span>${acc} accepted in the last 7 days${rate !== null ? ` &middot; yes-rate ${Math.round(rate * 100)}%` : ""}</span></p>
+    <p class="muted" style="margin-top:6px">${due.length ? `${due.length} ${due.length === 1 ? "step" : "steps"} due today.` : "Nothing due today."} ${calls} ${calls === 1 ? "call" : "calls"} booked so far.</p>`;
+}
+
+function dueRow(d, i) {
+  const l = d.lead;
+  return `<div class="waiting-row">
+    <div><p class="waiting-who">${esc(leadName(l))}</p>
+    <p class="waiting-when">${esc(l.business || l.segment || "")} &middot; ${esc(d.label)}</p></div>
+    <button class="btn btn-small" type="button" data-due="${i}">${esc(d.action)}</button>
+  </div>`;
+}
+
+function renderOutreach() {
+  dueItems();
+  renderOutreachHome();
+  const { sent, acc } = yesRate();
+  const st = safetyStatus();
+  const calls = D.leads.filter((l) => l.call_on).length;
+  const chats = D.leads.filter((l) => l.accepted_on).length;
+  $("ov-status").innerHTML = D.leads.length
+    ? `<p class="status-line">${statusChip(st)}<span>${esc(st.why)}</span></p>`
+    : `<p class="muted">No leads yet. Add the first approved batch in Leads.</p>`;
+  $("ov-funnel").innerHTML = `
+    <div class="funnel-step"><span class="n">${sent}</span><span class="l">Invited, last 7 days</span></div>
+    <div class="funnel-step"><span class="n">${acc}</span><span class="l">Accepted</span></div>
+    <div class="funnel-step"><span class="n">${chats}</span><span class="l">Chats open</span></div>
+    <div class="funnel-step"><span class="n">${calls}</span><span class="l">Calls booked</span></div>`;
+  const due = currentDue;
+  $("ov-due").innerHTML = due.length
+    ? due.slice(0, 3).map((d, i) => dueRow(d, i)).join("") + (due.length > 3 ? `<p class="fineprint">Plus ${due.length - 3} more in Due Today.</p>` : "")
+    : `<p class="muted">Nothing due. New accepts and follow-ups land here on their day.</p>`;
+  renderLeads();
+  renderDue();
+  renderChats();
+  renderTemplates();
+  renderSafety();
+}
+
+function renderLeads() {
+  $("leads-count").textContent = D.leads.length;
+  const list = $("leads-list");
+  if (!D.leads.length) {
+    list.innerHTML = `<div class="card"><p class="muted">No leads yet. The first approved batch of 50 lands here, best at the top.</p></div>`;
+    return;
+  }
+  const rows = [...D.leads].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
+  list.innerHTML = rows.map((l) => {
+    const chips = [];
+    if (l.segment) chips.push(`<span class="chip">${esc(l.segment)}</span>`);
+    if (l.lead_tier) chips.push(`<span class="chip chip-above">Batch ${esc(l.lead_tier)}</span>`);
+    chips.push(`<span class="chip">${esc(STAGE_LABELS[l.stage] || l.stage)}</span>`);
+    const bits = [l.business, l.location].filter(Boolean).map(esc).join(" &middot; ");
+    const prob = l.problem ? `<p class="lead-meta">Problem: ${esc(l.problem)}${l.confidence ? ` (${esc(l.confidence)})` : ""}</p>` : "";
+    const fix = l.fix ? `<p class="lead-meta">Fix: ${esc(l.fix)}</p>` : "";
+    const link = l.profile_url ? `<p class="lead-meta"><a href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open LinkedIn profile</a></p>` : "";
+    return `<article class="card">
+      <p class="person-email" style="cursor:default">${esc(leadName(l))}${typeof l.lead_score === "number" ? ` <span class="count-pill">${l.lead_score}</span>` : ""}</p>
+      ${bits ? `<p class="lead-meta">${bits}</p>` : ""}
+      <div class="post-meta">${chips.join("")}</div>
+      ${prob}${fix}
+      <p class="lead-meta">Next: ${esc(nextStepLabel(l))}</p>
+      ${link}
+    </article>`;
+  }).join("");
+}
+
+function renderDue() {
+  const list = $("due-list");
+  list.innerHTML = currentDue.length
+    ? `<div class="card">${currentDue.map((d, i) => dueRow(d, i)).join("")}</div>`
+    : `<div class="card"><p class="muted">Nothing due today. Replies, new accepts and follow-ups appear here on their day.</p></div>`;
+}
+
+function renderChats() {
+  const list = $("chats-list");
+  const chats = D.leads.filter((l) => l.accepted_on || ["msg1_sent", "replied", "chatting", "fu1_sent", "fu2_sent", "call_booked"].includes(l.stage));
+  if (!chats.length) {
+    list.innerHTML = `<div class="card"><p class="muted">No chats yet. Accepted connections appear here with their next step.</p></div>`;
+    return;
+  }
+  list.innerHTML = chats.map((l) => {
+    const ev = D.events.find((e) => e.lead_id === l.id);
+    const last = ev ? `<p class="lead-meta">Last touch: ${esc(ev.kind || "note")} &middot; ${fmtDate(ev.happened_on)}</p>` : "";
+    return `<article class="card">
+      <p class="person-email" style="cursor:default">${esc(leadName(l))}</p>
+      ${l.business ? `<p class="lead-meta">${esc(l.business)}</p>` : ""}
+      <div class="post-meta"><span class="chip">${esc(STAGE_LABELS[l.stage] || l.stage)}</span></div>
+      ${last}
+      <p class="lead-meta">Next: ${esc(nextStepLabel(l))}</p>
+    </article>`;
+  }).join("");
+}
+
+const TEMPLATES = [
+  ["Note N1 · after they engaged with your content", "Hi [Name], your post about [topic] made me smile, so I had to say hi properly :) I help Aussie business owners get their time back with websites and clever systems. Would love to connect."],
+  ["Note N2 · same-world tradie", "Hi [Name], fellow Aussie business owner here. I follow a few [trade] legends and your name keeps popping up :) I share simple ways owners win their evenings back. Keen to connect?"],
+  ["Note N3 · local", "Hi [Name], Gold Coast local here too. I help local owners stop missing calls and chasing paperwork. Always keen to know more good locals :) Connect?"],
+  ["Message 1 · tradies", "Thanks for connecting, [Name]! Quick question, no pitch hiding in it :) When a call comes in while you are on the tools, where does it go? I ask every [trade] owner I meet, and the answers are gold."],
+  ["Message 1 · booking-based services", "Thanks for connecting, [Name] :) Genuine question: when the phone rings at 7pm and nobody can grab it, what happens to that booking? I collect answers from owners like you."],
+  ["Message 1 · website prospects", "Thanks for connecting, [Name]! Curious about one thing: if I searched for a [service] in [suburb] tonight, would your website be the one that wins me? No wrong answer, I just love hearing how owners see it :)"],
+  ["Follow-up 1 · the freebie gift", "Floating this back up, [Name] :) I made a tiny free scorecard that shows why Google hides some local businesses. Happy to send it over if you want a look, no strings."],
+  ["Follow-up 1 · the after-hours truth", "Tiny thought from my week, [Name]: the owners I chat with lose most jobs after hours, not during the day. The fix is boring and small. Want me to share what I mean?"],
+  ["Follow-up 2 · the receptionist demo", "Last one from me, [Name], I do not chase :) I built a demo receptionist that answers calls at any hour and books the job in. It is live and free to test. Want the link to try it on your own business?"],
+  ["Follow-up 2 · the free prototype", "Closing the loop, [Name] :) My thing is simple: I build you a working website prototype first, free, and you only pay if you love it. If that ever sounds handy, I am one message away. Either way, glad we connected."],
+  ["Reply starter · price question", "Fair question :) Websites start with a free prototype, so you see yours before you pay a cent. The systems start at A$1,497 set up, with care plans from A$199 a month. Want me to look at your setup and quote it properly?"]
+];
+
+function renderTemplates() {
+  $("templates-list").innerHTML = TEMPLATES.map(([t, b]) => `
+    <div class="card">
+      <h2>${esc(t)}</h2>
+      <p class="template-body">${esc(b)}</p>
+    </div>`).join("");
+}
+
+function renderSafety() {
+  const { sent, acc, rate } = yesRate();
+  const st = safetyStatus();
+  $("safety-main").innerHTML = `
+    <p class="status-line">${statusChip(st)}<span>${esc(st.why)}</span></p>
+    <div class="budget-bar"><div id="safety-budget-fill" style="width:${Math.min(100, sent)}%"></div></div>
+    <p class="lead-meta" style="margin-top:8px">Invites, last 7 days: ${sent} of 100 &middot; Accepted: ${acc}${rate !== null ? ` &middot; Yes-rate: ${Math.round(rate * 100)}% (target 30% or more, stop under 25%)` : ""}</p>
+    <p class="lead-meta">Personalised invite notes are precious on a free account, about 3 a month. Spend them on batch A only.</p>`;
+  const pend = oldPending();
+  $("safety-pending").innerHTML = pend.length
+    ? pend.slice(0, 10).map((l) => `<div class="past-row"><span>${esc(leadName(l))}</span><span class="waiting-when">invited ${fmtDate(l.invite_sent_on)}</span></div>`).join("") + (pend.length > 10 ? `<p class="fineprint">Plus ${pend.length - 10} more.</p>` : "")
+    : `<p class="muted">None. Invites older than 21 days with no answer show up here, ready to withdraw.</p>`;
+}
+
+async function patchLead(id, patch, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
+  try {
+    await sb(`li_outreach_leads?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: patch });
+    const row = D.leads.find((l) => l.id === id);
+    if (row) Object.assign(row, patch);
+    try { await sb("li_outreach_events", { method: "POST", headers: { Prefer: "return=minimal" }, body: { lead_id: id, kind: patch.stage || "update", happened_on: brisDateStr(new Date()) } }); } catch (e) {}
+    renderOutreach();
+    renderAttention();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "Try again"; }
+  }
+}
+
+async function addLead(ev) {
+  ev.preventDefault();
+  const status = $("o-add-status");
+  const first = $("o-first").value.trim();
+  if (!first) { status.textContent = "Add at least a first name."; return; }
+  const scoreRaw = $("o-score").value.trim();
+  const score = scoreRaw === "" ? null : Math.max(0, Math.min(100, parseInt(scoreRaw, 10) || 0));
+  const tier = score === null ? null : score >= 70 ? "A" : score >= 50 ? "B" : "C";
+  try {
+    await sb("li_outreach_leads", { method: "POST", headers: { Prefer: "return=minimal" }, body: {
+      first_name: first,
+      last_name: $("o-last").value.trim() || null,
+      business: $("o-business").value.trim() || null,
+      segment: $("o-segment").value.trim() || null,
+      lead_score: score, lead_tier: tier,
+      problem: $("o-problem").value.trim() || null,
+      profile_url: $("o-url").value.trim() || null,
+      stage: "new"
+    } });
+    status.textContent = `Added ${first}. They are in the Leads list.`;
+    ev.target.reset();
+    await refreshData();
+    switchOSub("leads");
+  } catch (e) {
+    status.textContent = "Could not save that lead. Try again in a moment.";
+  }
+}
+
+function switchOSub(name) {
+  document.querySelectorAll(".osub").forEach((p) => {
+    const on = p.id === `osub-${name}`;
+    p.hidden = !on;
+    p.classList.toggle("active", on);
+  });
+  document.querySelectorAll("[data-osub]").forEach((b) => b.classList.toggle("active", b.dataset.osub === name));
 }
 
 // ---- POSTS ----
@@ -574,6 +836,7 @@ function switchView(name) {
     v.classList.toggle("active", on);
   });
   document.querySelectorAll(".side-item").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+  $("outreach-subs").hidden = name !== "outreach";
   closeSidebar();
   window.scrollTo({ top: 0 });
 }
@@ -583,7 +846,7 @@ async function refreshData() {
   try {
     await loadAll();
     if (errBox) errBox.remove();
-    renderHome(); renderPosts(); renderFreebies(); renderPeople(); renderPhotos();
+    renderHome(); renderPosts(); renderFreebies(); renderPeople(); renderPhotos(); renderOutreach();
   } catch (e) {
     $("last-updated").textContent = "Could not load. Pull down to try again.";
     if (!errBox) {
@@ -617,6 +880,21 @@ function init() {
   $("fb-add-form").addEventListener("submit", addRequest);
   ["fb-name", "fb-keyword"].forEach((id) => $(id).addEventListener("input", () => { $(id).dataset.touched = "1"; }));
   $("btn-reminders").addEventListener("click", enableReminders);
+  document.querySelectorAll(".side-sub, .otoggle").forEach((b) => b.addEventListener("click", () => { switchView("outreach"); switchOSub(b.dataset.osub); }));
+  $("btn-open-outreach").addEventListener("click", () => { switchView("outreach"); switchOSub("overview"); });
+  $("attention").addEventListener("click", (ev) => {
+    const li = ev.target.closest("[data-goto]");
+    if (li) { switchView("outreach"); switchOSub(li.dataset.goto); }
+  });
+  const dueClick = (ev) => {
+    const btn = ev.target.closest("[data-due]");
+    if (!btn) return;
+    const item = currentDue[Number(btn.dataset.due)];
+    if (item) patchLead(item.lead.id, item.patch, btn);
+  };
+  $("due-list").addEventListener("click", dueClick);
+  $("ov-due").addEventListener("click", dueClick);
+  $("o-add-form").addEventListener("submit", addLead);
 
   const dz = $("dropzone"), input = $("photo-input");
   dz.addEventListener("click", () => input.click());
