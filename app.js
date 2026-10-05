@@ -365,11 +365,31 @@ function renderOutreachHome() {
 
 function dueRow(d, i) {
   const l = d.lead;
-  return `<div class="waiting-row">
-    <div><p class="waiting-who">${esc(leadName(l))}</p>
-    <p class="waiting-when">${esc(l.business || l.segment || "")} &middot; ${esc(d.label)}</p></div>
-    <button class="btn btn-small" type="button" data-due="${i}">${esc(d.action)}</button>
+  const msg = l.next_message ? `<p class="due-msg">${esc(l.next_message)}</p>` : "";
+  const copyBtn = l.next_message ? `<button class="btn btn-small" type="button" data-copy-msg="${i}">Copy message</button>` : "";
+  const openBtn = l.profile_url ? `<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>` : "";
+  return `<div class="due-row">
+    <p class="waiting-who">${esc(leadName(l))}</p>
+    <p class="waiting-when">${esc(l.business || l.segment || "")} &middot; ${esc(d.label)}</p>
+    ${msg}
+    <div class="due-actions">${copyBtn}${openBtn}<button class="btn btn-small" type="button" data-due="${i}">${esc(d.action)}</button></div>
   </div>`;
+}
+
+async function copyMsg(text, btn) {
+  const old = btn.textContent;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+    ta.remove();
+  }
+  btn.textContent = ok ? "Copied" : "Copy failed";
+  setTimeout(() => { btn.textContent = old; }, 1400);
 }
 
 function renderOutreach() {
@@ -887,6 +907,12 @@ function init() {
     if (li) { switchView("outreach"); switchOSub(li.dataset.goto); }
   });
   const dueClick = (ev) => {
+    const cbtn = ev.target.closest("[data-copy-msg]");
+    if (cbtn) {
+      const item = currentDue[Number(cbtn.dataset.copyMsg)];
+      if (item && item.lead.next_message) copyMsg(item.lead.next_message, cbtn);
+      return;
+    }
     const btn = ev.target.closest("[data-due]");
     if (!btn) return;
     const item = currentDue[Number(btn.dataset.due)];
