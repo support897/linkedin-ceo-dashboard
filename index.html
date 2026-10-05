@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
 
@@ -53,6 +53,19 @@
     <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="10" width="36" height="28" rx="5" fill="#C4D4EC" stroke="#1A1A2E" stroke-width="2.4"/><circle cx="17" cy="20" r="3.4" fill="#FFFEFA"/><path d="M8 34 L20 24 L29 31 L34 27 L40 32 L40 36 Q40 38 38 38 L10 38 Q8 38 8 36 Z" fill="#9BD3AC"/></svg>
     <span>Photos</span>
   </button>
+  <button class="side-item" data-view="outreach" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 8 H38 Q42 8 42 12 V30 Q42 34 38 34 H22 L13 42 V34 H10 Q6 34 6 30 V12 Q6 8 10 8 Z" fill="#CCECE4" stroke="#1A1A2E" stroke-width="2.6" stroke-linejoin="round"/><path d="M14 17 H34 M14 24 H27" stroke="#1A1A2E" stroke-width="3" stroke-linecap="round"/></svg>
+    <span>Outreach</span>
+    <span class="side-badge" id="outreach-badge" hidden>0</span>
+  </button>
+  <div id="outreach-subs" hidden>
+    <button class="side-sub active" data-osub="overview" type="button">Overview</button>
+    <button class="side-sub" data-osub="leads" type="button">Leads</button>
+    <button class="side-sub" data-osub="due" type="button">Due Today</button>
+    <button class="side-sub" data-osub="chats" type="button">Chats</button>
+    <button class="side-sub" data-osub="templates" type="button">Templates</button>
+    <button class="side-sub" data-osub="safety" type="button">Safety</button>
+  </div>
 </aside>
 
 <div id="pull-hint" class="pull-hint" hidden>Release to refresh</div>
@@ -61,6 +74,14 @@
   <!-- HOME -->
   <section id="view-home" class="view active">
     <div id="attention" class="attention" hidden></div>
+
+    <div class="card card-blue" id="outreach-card">
+      <h2>Outreach</h2>
+      <div id="outreach-summary"><p class="muted">Loading...</p></div>
+      <div class="budget-bar"><div id="outreach-budget-fill"></div></div>
+      <p class="fineprint" id="outreach-budget-label">Weekly invite budget: 100 max.</p>
+      <button class="btn btn-small" id="btn-open-outreach" type="button">Open Outreach</button>
+    </div>
 
     <div class="card card-rose" id="this-week-card">
       <h2>This Week</h2>
@@ -152,6 +173,105 @@
     <div id="people-list"><p class="muted pad">Loading...</p></div>
   </section>
 
+  <!-- OUTREACH -->
+  <section id="view-outreach" class="view" hidden>
+    <div class="subbar" role="group" aria-label="Outreach sections">
+      <button class="toggle otoggle active" data-osub="overview" type="button">Overview</button>
+      <button class="toggle otoggle" data-osub="leads" type="button">Leads</button>
+      <button class="toggle otoggle" data-osub="due" type="button">Due Today</button>
+      <button class="toggle otoggle" data-osub="chats" type="button">Chats</button>
+      <button class="toggle otoggle" data-osub="templates" type="button">Templates</button>
+      <button class="toggle otoggle" data-osub="safety" type="button">Safety</button>
+    </div>
+
+    <div class="osub active" id="osub-overview">
+      <div class="card card-rose">
+        <h2>Last 7 days</h2>
+        <div id="ov-status"><p class="muted">Loading...</p></div>
+        <div class="funnel" id="ov-funnel"></div>
+      </div>
+      <div class="card">
+        <h2>Due today</h2>
+        <div id="ov-due"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <div class="osub" id="osub-leads" hidden>
+      <div class="card card-blue">
+        <h2>Leads <span class="count-pill" id="leads-count">0</span></h2>
+        <p class="muted">Best first: batch A at the top. Every lead carries its problem and the proof of where it was seen.</p>
+      </div>
+      <div id="leads-list"><p class="muted pad">Loading...</p></div>
+      <div class="card">
+        <h2>Add a lead</h2>
+        <form id="o-add-form">
+          <label class="field-label" for="o-first">First name</label>
+          <input id="o-first" type="text" autocomplete="off" required>
+          <label class="field-label" for="o-last">Last name</label>
+          <input id="o-last" type="text" autocomplete="off">
+          <label class="field-label" for="o-business">Business</label>
+          <input id="o-business" type="text" autocomplete="off">
+          <label class="field-label" for="o-segment">Segment</label>
+          <input id="o-segment" type="text" autocomplete="off" placeholder="e.g. Tradie, Bookings, Website, Partner">
+          <label class="field-label" for="o-score">Lead score (0 to 100)</label>
+          <input id="o-score" type="text" inputmode="numeric" autocomplete="off" placeholder="70+ = batch A">
+          <label class="field-label" for="o-problem">Problem spotted</label>
+          <input id="o-problem" type="text" autocomplete="off" placeholder="e.g. Chasing late invoices">
+          <label class="field-label" for="o-url">LinkedIn profile link</label>
+          <input id="o-url" type="text" autocomplete="off" placeholder="https://www.linkedin.com/in/...">
+          <button class="btn btn-primary" type="submit">Add lead</button>
+          <p class="fineprint" id="o-add-status"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="osub" id="osub-due" hidden>
+      <div class="card card-rose">
+        <h2>Due today</h2>
+        <p class="muted">Replies first, then follow-ups. Tap the button once the message is sent. Follow-up 2 is the last touch, then we stop.</p>
+      </div>
+      <div id="due-list"><p class="muted pad">Loading...</p></div>
+    </div>
+
+    <div class="osub" id="osub-chats" hidden>
+      <div class="card card-blue">
+        <h2>Chats</h2>
+        <p class="muted">Everyone who accepted, and where each chat is up to.</p>
+      </div>
+      <div id="chats-list"><p class="muted pad">Loading...</p></div>
+    </div>
+
+    <div class="osub" id="osub-templates" hidden>
+      <div class="card card-mint">
+        <h2>Approved messages</h2>
+        <p class="muted">Read-only. Wording changes happen in the system pack first, then land here. Swap the [slots] for real details every time.</p>
+      </div>
+      <div id="templates-list"></div>
+    </div>
+
+    <div class="osub" id="osub-safety" hidden>
+      <div class="card card-rose">
+        <h2>Account safety</h2>
+        <div id="safety-main"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card">
+        <h2>Old invites to withdraw</h2>
+        <div id="safety-pending"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card">
+        <h2>The guard rules</h2>
+        <ul class="rule-list">
+          <li>100 invites a week is the whole budget. About 20 a day, weekdays only.</li>
+          <li>Yes-rate under 25% for a week: stop, fix the list or the note.</li>
+          <li>Any LinkedIn warning or extra check: stop everything for 2 weeks.</li>
+          <li>Withdraw invites still unanswered after 21 days.</li>
+          <li>Never the same wording to a long run of people.</li>
+          <li>Outreach alerts ride on the same Reminders switch on Home. Turn reminders on there once, and due items also show in Needs Attention on Home.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <!-- PHOTOS -->
   <section id="view-photos" class="view" hidden>
     <div class="card">
@@ -180,6 +300,6 @@
   </section>
 </main>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
