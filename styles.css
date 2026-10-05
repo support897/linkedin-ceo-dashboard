@@ -272,3 +272,11 @@ input[type="text"]:focus { outline: 2px solid var(--peri); border-color: var(--p
 .attention li[data-goto] { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .lead-meta { font-size: 13px; font-weight: 700; color: rgba(26,26,46,.62); margin-top: 4px; line-height: 1.45; }
 .template-body { font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; }
+.due-row { padding: 10px 0; border-bottom: 1.5px dashed var(--powder); }
+.due-row:last-child { border-bottom: none; }
+.due-msg {
+  font-size: 13.5px; line-height: 1.45; background: var(--tint-blue);
+  border-radius: 10px; padding: 8px 10px; margin: 6px 0; white-space: pre-wrap;
+}
+.due-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+a.btn { text-decoration: none; display: inline-block; }
