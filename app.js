@@ -321,6 +321,8 @@ function dueItems() {
     else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today } });
     else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today } });
   }
+  const dueRank = (d) => d.action.includes("answered") ? 0 : d.action.includes("message 1") ? 1 : d.action.includes("follow-up 1") ? 2 : 3;
+  out.sort((a, b) => dueRank(a) - dueRank(b));
   currentDue = out;
   return out;
 }
@@ -434,7 +436,10 @@ function renderLeads() {
     const bits = [l.business, l.location].filter(Boolean).map(esc).join(" &middot; ");
     const prob = l.problem ? `<p class="lead-meta">Problem: ${esc(l.problem)}${l.confidence ? ` (${esc(l.confidence)})` : ""}</p>` : "";
     const fix = l.fix ? `<p class="lead-meta">Fix: ${esc(l.fix)}</p>` : "";
-    const link = l.profile_url ? `<p class="lead-meta"><a href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open LinkedIn profile</a></p>` : "";
+    const acts = [];
+    if (l.next_message) acts.push(`<button class="btn btn-small" type="button" data-copy-lead="${l.id}">Copy note</button>`);
+    if (l.profile_url) acts.push(`<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>`);
+    const link = acts.length ? `<div class="due-actions">${acts.join("")}</div>` : "";
     return `<article class="card">
       <p class="person-email" style="cursor:default">${esc(leadName(l))}${typeof l.lead_score === "number" ? ` <span class="count-pill">${l.lead_score}</span>` : ""}</p>
       ${bits ? `<p class="lead-meta">${bits}</p>` : ""}
@@ -919,6 +924,12 @@ function init() {
     if (item) patchLead(item.lead.id, item.patch, btn);
   };
   $("due-list").addEventListener("click", dueClick);
+  $("leads-list").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-copy-lead]");
+    if (!b) return;
+    const lead = D.leads.find((x) => String(x.id) === b.dataset.copyLead);
+    if (lead && lead.next_message) copyMsg(lead.next_message, b);
+  });
   $("ov-due").addEventListener("click", dueClick);
   $("o-add-form").addEventListener("submit", addLead);
 
