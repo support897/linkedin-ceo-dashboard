@@ -316,10 +316,10 @@ function dueItems() {
   const out = [];
   for (const l of D.leads) {
     if (TERMINAL_STAGES.includes(l.stage)) continue;
-    if (l.stage === "replied") out.push({ lead: l, label: "Reply waiting for your answer", action: "Mark answered", patch: { stage: "chatting" } });
-    else if (l.accepted_on && !l.msg1_on) out.push({ lead: l, label: "Accepted you. Message 1 is due", action: "Mark message 1 sent", patch: { stage: "msg1_sent", msg1_on: today } });
-    else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today } });
-    else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today } });
+    if (l.stage === "replied") out.push({ lead: l, label: "Reply waiting for your answer", action: "Mark answered", patch: { stage: "chatting" }, draft: null });
+    else if (l.accepted_on && !l.msg1_on) out.push({ lead: l, label: "Accepted you. Message 1 is due", action: "Mark message 1 sent", patch: { stage: "msg1_sent", msg1_on: today }, draft: l.draft_msg1 || l.next_message });
+    else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today }, draft: l.draft_fu1 });
+    else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today }, draft: l.draft_fu2 });
   }
   const dueRank = (d) => d.action.includes("answered") ? 0 : d.action.includes("message 1") ? 1 : d.action.includes("follow-up 1") ? 2 : 3;
   out.sort((a, b) => dueRank(a) - dueRank(b));
@@ -367,8 +367,8 @@ function renderOutreachHome() {
 
 function dueRow(d, i) {
   const l = d.lead;
-  const msg = l.next_message ? `<p class="due-msg">${esc(l.next_message)}</p>` : "";
-  const copyBtn = l.next_message ? `<button class="btn btn-small" type="button" data-copy-msg="${i}">Copy message</button>` : "";
+  const msg = d.draft ? `<p class="due-msg">${esc(d.draft)}</p>` : "";
+  const copyBtn = d.draft ? `<button class="btn btn-small" type="button" data-copy-msg="${i}">Copy message</button>` : "";
   const openBtn = l.profile_url ? `<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>` : "";
   return `<div class="due-row">
     <p class="waiting-who">${esc(leadName(l))}</p>
@@ -421,6 +421,37 @@ function renderOutreach() {
   renderAlreadySent();
 }
 
+function nextDraft(l) {
+  if (!l.invite_sent_on && l.draft_note) return { label: "Copy note", text: l.draft_note };
+  if (l.accepted_on && !l.msg1_on && l.draft_msg1) return { label: "Copy message 1", text: l.draft_msg1 };
+  if (l.msg1_on && !l.fu1_on && l.draft_fu1) return { label: "Copy follow-up 1", text: l.draft_fu1 };
+  if (l.fu1_on && !l.fu2_on && l.draft_fu2) return { label: "Copy follow-up 2", text: l.draft_fu2 };
+  if (l.draft_note) return { label: "Copy note", text: l.draft_note };
+  if (l.next_message) return { label: "Copy message", text: l.next_message };
+  return null;
+}
+
+function pipeHtml(l) {
+  const steps = [
+    { n: 1, name: "Connection note", field: "draft_note", text: l.draft_note, done: !!l.invite_sent_on, doneOn: l.invite_sent_on, here: !l.invite_sent_on, wait: "" },
+    { n: 2, name: "First message", field: "draft_msg1", text: l.draft_msg1, done: !!l.msg1_on, doneOn: l.msg1_on, here: !!l.accepted_on && !l.msg1_on, wait: l.invite_sent_on && !l.accepted_on ? "Waiting for a yes" : "" },
+    { n: 3, name: "Follow-up 1 \u00b7 day 3-4", field: "draft_fu1", text: l.draft_fu1, done: !!l.fu1_on, doneOn: l.fu1_on, here: !!l.msg1_on && !l.fu1_on, wait: "" },
+    { n: 4, name: "Follow-up 2 \u00b7 day 8-10", field: "draft_fu2", text: l.draft_fu2, done: !!l.fu2_on, doneOn: l.fu2_on, here: !!l.fu1_on && !l.fu2_on, wait: "" },
+  ].filter((x) => x.text);
+  if (!steps.length) return "";
+  const rows = steps.map((x) => {
+    const state = x.done ? `<span class="chip chip-sent">Sent ${esc(fmtDate(x.doneOn))}</span>`
+      : x.here ? `<span class="chip chip-above">You are here</span>`
+      : x.wait ? `<span class="chip">${esc(x.wait)}</span>` : `<span class="chip">Waiting</span>`;
+    return `<div class="step${x.here ? " here" : ""}">
+      <div class="step-head"><span class="step-name">${x.n} \u00b7 ${esc(x.name)}</span>${state}</div>
+      <p class="due-msg">${esc(x.text)}</p>
+      <button class="btn btn-small" type="button" data-copy-step="${l.id}:${x.field}">Copy this step</button>
+    </div>`;
+  }).join("");
+  return `<div class="pipeline" id="pipe-${l.id}" hidden>${rows}</div>`;
+}
+
 function renderLeads() {
   $("leads-count").textContent = D.leads.length;
   const list = $("leads-list");
@@ -438,9 +469,12 @@ function renderLeads() {
     const prob = l.problem ? `<p class="lead-meta">Problem: ${esc(l.problem)}${l.confidence ? ` (${esc(l.confidence)})` : ""}</p>` : "";
     const fix = l.fix ? `<p class="lead-meta">Fix: ${esc(l.fix)}</p>` : "";
     const acts = [];
-    if (l.next_message) acts.push(`<button class="btn btn-small" type="button" data-copy-lead="${l.id}">Copy note</button>`);
+    const nd = nextDraft(l);
+    if (nd) acts.push(`<button class="btn btn-small" type="button" data-copy-next="${l.id}">${esc(nd.label)}</button>`);
     if (l.profile_url) acts.push(`<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>`);
-    const link = acts.length ? `<div class="due-actions">${acts.join("")}</div>` : "";
+    const pipe = pipeHtml(l);
+    if (pipe) acts.push(`<button class="btn btn-small" type="button" data-pipe="${l.id}">See the 4 drafts</button>`);
+    const link = acts.length ? `<div class="due-actions">${acts.join("")}</div>${pipe}` : "";
     return `<article class="card">
       <p class="person-email" style="cursor:default">${esc(leadName(l))}${typeof l.lead_score === "number" ? ` <span class="count-pill">${l.lead_score}</span>` : ""}</p>
       ${bits ? `<p class="lead-meta">${bits}</p>` : ""}
@@ -981,7 +1015,7 @@ function init() {
     const cbtn = ev.target.closest("[data-copy-msg]");
     if (cbtn) {
       const item = currentDue[Number(cbtn.dataset.copyMsg)];
-      if (item && item.lead.next_message) copyMsg(item.lead.next_message, cbtn);
+      if (item && item.draft) copyMsg(item.draft, cbtn);
       return;
     }
     const btn = ev.target.closest("[data-due]");
@@ -991,10 +1025,24 @@ function init() {
   };
   $("due-list").addEventListener("click", dueClick);
   $("leads-list").addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-copy-lead]");
+    const pb = ev.target.closest("[data-pipe]");
+    if (pb) {
+      const box = $("pipe-" + pb.dataset.pipe);
+      if (box) { box.hidden = !box.hidden; pb.textContent = box.hidden ? "See the 4 drafts" : "Hide the drafts"; }
+      return;
+    }
+    const sb2 = ev.target.closest("[data-copy-step]");
+    if (sb2) {
+      const [lid, field] = sb2.dataset.copyStep.split(":");
+      const lead = D.leads.find((x) => String(x.id) === lid);
+      if (lead && lead[field]) copyMsg(lead[field], sb2);
+      return;
+    }
+    const b = ev.target.closest("[data-copy-next]");
     if (!b) return;
-    const lead = D.leads.find((x) => String(x.id) === b.dataset.copyLead);
-    if (lead && lead.next_message) copyMsg(lead.next_message, b);
+    const lead = D.leads.find((x) => String(x.id) === b.dataset.copyNext);
+    const nd = lead && nextDraft(lead);
+    if (nd) copyMsg(nd.text, b);
   });
   $("ov-due").addEventListener("click", dueClick);
   $("o-add-form").addEventListener("submit", addLead);
