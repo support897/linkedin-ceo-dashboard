@@ -418,6 +418,7 @@ function renderOutreach() {
   renderChats();
   renderTemplates();
   renderSafety();
+  renderSent();
 }
 
 function renderLeads() {
@@ -512,6 +513,53 @@ function renderSafety() {
   $("safety-pending").innerHTML = pend.length
     ? pend.slice(0, 10).map((l) => `<div class="past-row"><span>${esc(leadName(l))}</span><span class="waiting-when">invited ${fmtDate(l.invite_sent_on)}</span></div>`).join("") + (pend.length > 10 ? `<p class="fineprint">Plus ${pend.length - 10} more.</p>` : "")
     : `<p class="muted">None. Invites older than 21 days with no answer show up here, ready to withdraw.</p>`;
+}
+
+// ---- ALREADY SENT: every invite, which follow-up went out, and where they landed ----
+const INTERESTED_STAGES = ["replied", "chatting", "call_booked", "won"];
+const NOT_INTERESTED_STAGES = ["not_now", "closed"];
+const SENT_BUCKETS = { interested: "Replied, interested", no_reply: "No reply", not_interested: "Not interested" };
+
+function sentBucket(l) {
+  if (INTERESTED_STAGES.includes(l.stage)) return "interested";
+  if (NOT_INTERESTED_STAGES.includes(l.stage)) return "not_interested";
+  return "no_reply";
+}
+function lastTouchSent(l) {
+  if (l.fu2_on) return `Follow-up 2 · ${fmtDate(l.fu2_on)}`;
+  if (l.fu1_on) return `Follow-up 1 · ${fmtDate(l.fu1_on)}`;
+  if (l.msg1_on) return `Message 1 · ${fmtDate(l.msg1_on)}`;
+  if (l.accepted_on) return `Accepted · ${fmtDate(l.accepted_on)}`;
+  if (l.invite_sent_on) return `Invite · ${fmtDate(l.invite_sent_on)}`;
+  return "Not sent yet";
+}
+
+function renderSent() {
+  const sent = D.leads.filter((l) => l.invite_sent_on);
+  const interested = sent.filter((l) => sentBucket(l) === "interested");
+  const notInt = sent.filter((l) => sentBucket(l) === "not_interested");
+  const noReply = sent.filter((l) => sentBucket(l) === "no_reply");
+  const funnel = $("sent-funnel");
+  if (funnel) {
+    funnel.innerHTML = `
+      <div class="funnel-step"><span class="n">${sent.length}</span><span class="l">Invites sent</span></div>
+      <div class="funnel-step"><span class="n">${interested.length}</span><span class="l">Replied, interested</span></div>
+      <div class="funnel-step"><span class="n">${noReply.length}</span><span class="l">No reply</span></div>
+      <div class="funnel-step"><span class="n">${notInt.length}</span><span class="l">Not interested</span></div>`;
+  }
+  const list = $("sent-list");
+  if (list) {
+    list.innerHTML = sent.length
+      ? [...sent].sort((a, b) => String(b.invite_sent_on).localeCompare(String(a.invite_sent_on))).map((l) => `
+        <div class="past-row"><span>${esc(leadName(l))}${l.business ? ` <span class="waiting-when">· ${esc(l.business)}</span>` : ""}</span><span class="waiting-when">${esc(lastTouchSent(l))} · ${esc(SENT_BUCKETS[sentBucket(l)])}</span></div>`).join("")
+      : `<p class="muted">Nothing sent yet. Invites land here the moment they go out.</p>`;
+  }
+  const widget = $("sent-summary");
+  if (widget) {
+    widget.innerHTML = sent.length
+      ? `<p class="status-line"><span>${sent.length} invites sent &middot; ${interested.length} interested &middot; ${noReply.length} no reply &middot; ${notInt.length} not interested</span></p>`
+      : `<p class="muted">Nothing sent yet.</p>`;
+  }
 }
 
 async function patchLead(id, patch, btn) {
@@ -907,6 +955,7 @@ function init() {
   $("btn-reminders").addEventListener("click", enableReminders);
   document.querySelectorAll(".side-sub, .otoggle").forEach((b) => b.addEventListener("click", () => { switchView("outreach"); switchOSub(b.dataset.osub); }));
   $("btn-open-outreach").addEventListener("click", () => { switchView("outreach"); switchOSub("overview"); });
+  $("btn-open-sent").addEventListener("click", () => { switchView("outreach"); switchOSub("sent"); });
   $("attention").addEventListener("click", (ev) => {
     const li = ev.target.closest("[data-goto]");
     if (li) { switchView("outreach"); switchOSub(li.dataset.goto); }
