@@ -418,7 +418,7 @@ function renderOutreach() {
   renderChats();
   renderTemplates();
   renderSafety();
-  renderSent();
+  renderAlreadySent();
 }
 
 function renderLeads() {
@@ -515,51 +515,68 @@ function renderSafety() {
     : `<p class="muted">None. Invites older than 21 days with no answer show up here, ready to withdraw.</p>`;
 }
 
-// ---- ALREADY SENT: every invite, which follow-up went out, and where they landed ----
 const INTERESTED_STAGES = ["replied", "chatting", "call_booked", "won"];
-const NOT_INTERESTED_STAGES = ["not_now", "closed"];
-const SENT_BUCKETS = { interested: "Replied, interested", no_reply: "No reply", not_interested: "Not interested" };
+const NOREPLY_STAGES = ["invited", "accepted", "msg1_sent", "fu1_sent", "fu2_sent"];
+const NOTINT_STAGES = ["not_now", "closed"];
 
-function sentBucket(l) {
-  if (INTERESTED_STAGES.includes(l.stage)) return "interested";
-  if (NOT_INTERESTED_STAGES.includes(l.stage)) return "not_interested";
-  return "no_reply";
+function sentLeads() {
+  return D.leads.filter((l) => l.invite_sent_on);
 }
-function lastTouchSent(l) {
-  if (l.fu2_on) return `Follow-up 2 · ${fmtDate(l.fu2_on)}`;
-  if (l.fu1_on) return `Follow-up 1 · ${fmtDate(l.fu1_on)}`;
-  if (l.msg1_on) return `Message 1 · ${fmtDate(l.msg1_on)}`;
-  if (l.accepted_on) return `Accepted · ${fmtDate(l.accepted_on)}`;
-  if (l.invite_sent_on) return `Invite · ${fmtDate(l.invite_sent_on)}`;
-  return "Not sent yet";
+function lastTouchLabel(l) {
+  if (l.fu2_on) return "Follow-up 2";
+  if (l.fu1_on) return "Follow-up 1";
+  if (l.msg1_on) return "Message 1";
+  return "Invite only";
 }
-
-function renderSent() {
-  const sent = D.leads.filter((l) => l.invite_sent_on);
-  const interested = sent.filter((l) => sentBucket(l) === "interested");
-  const notInt = sent.filter((l) => sentBucket(l) === "not_interested");
-  const noReply = sent.filter((l) => sentBucket(l) === "no_reply");
-  const funnel = $("sent-funnel");
-  if (funnel) {
-    funnel.innerHTML = `
-      <div class="funnel-step"><span class="n">${sent.length}</span><span class="l">Invites sent</span></div>
-      <div class="funnel-step"><span class="n">${interested.length}</span><span class="l">Replied, interested</span></div>
-      <div class="funnel-step"><span class="n">${noReply.length}</span><span class="l">No reply</span></div>
-      <div class="funnel-step"><span class="n">${notInt.length}</span><span class="l">Not interested</span></div>`;
+function sentRow(l) {
+  const bits = [l.business, lastTouchLabel(l)].filter(Boolean).map(esc).join(" &middot; ");
+  const when = l.invite_sent_on ? `invited ${fmtDate(l.invite_sent_on)}` : "";
+  return `<div class="past-row"><span>${esc(leadName(l))}</span><span class="waiting-when">${bits}${when ? ` &middot; ${when}` : ""}</span></div>`;
+}
+function sentGroup(title, leads, emptyText) {
+  return `<div class="card">
+    <h2>${esc(title)} <span class="count-pill">${leads.length}</span></h2>
+    ${leads.length ? leads.map(sentRow).join("") : `<p class="muted">${esc(emptyText)}</p>`}
+  </div>`;
+}
+function renderAlreadySent() {
+  const list = $("alreadysent-list");
+  const sent = sentLeads();
+  $("alreadysent-count").textContent = sent.length;
+  const interested = sent.filter((l) => INTERESTED_STAGES.includes(l.stage));
+  const noreply = sent.filter((l) => NOREPLY_STAGES.includes(l.stage));
+  const notint = sent.filter((l) => NOTINT_STAGES.includes(l.stage));
+  if (!sent.length) {
+    list.innerHTML = `<div class="card"><p class="muted">No invites sent yet. Every invite and its follow-ups land here automatically.</p></div>`;
+  } else {
+    const m1 = sent.filter((l) => l.msg1_on && !l.fu1_on && !l.fu2_on).length;
+    const f1 = sent.filter((l) => l.fu1_on && !l.fu2_on).length;
+    const f2 = sent.filter((l) => l.fu2_on).length;
+    list.innerHTML = `<div class="card card-mint">
+        <h2>All invites</h2>
+        <p class="muted">${sent.length} sent${m1 ? ` &middot; ${m1} got Message 1` : ""}${f1 ? ` &middot; ${f1} got Follow-up 1` : ""}${f2 ? ` &middot; ${f2} got Follow-up 2` : ""}</p>
+      </div>`
+      + sentGroup("Replied interested", interested, "None yet.")
+      + sentGroup("Didn't reply", noreply, "None. Everyone has answered so far.")
+      + sentGroup("Not interested", notint, "None.");
   }
-  const list = $("sent-list");
-  if (list) {
-    list.innerHTML = sent.length
-      ? [...sent].sort((a, b) => String(b.invite_sent_on).localeCompare(String(a.invite_sent_on))).map((l) => `
-        <div class="past-row"><span>${esc(leadName(l))}${l.business ? ` <span class="waiting-when">· ${esc(l.business)}</span>` : ""}</span><span class="waiting-when">${esc(lastTouchSent(l))} · ${esc(SENT_BUCKETS[sentBucket(l)])}</span></div>`).join("")
-      : `<p class="muted">Nothing sent yet. Invites land here the moment they go out.</p>`;
+  renderSentGlance(sent, interested, noreply, notint);
+}
+function renderSentGlance(sent, interested, noreply, notint) {
+  const box = $("sent-glance");
+  if (!box) return;
+  if (!sent.length) {
+    box.innerHTML = `<p class="muted">No invites sent yet.</p>`;
+    return;
   }
-  const widget = $("sent-summary");
-  if (widget) {
-    widget.innerHTML = sent.length
-      ? `<p class="status-line"><span>${sent.length} invites sent &middot; ${interested.length} interested &middot; ${noReply.length} no reply &middot; ${notInt.length} not interested</span></p>`
-      : `<p class="muted">Nothing sent yet.</p>`;
-  }
+  const fu = sent.filter((l) => l.fu1_on || l.fu2_on).length;
+  box.innerHTML = `<div class="funnel">
+    <div class="funnel-step"><span class="n">${sent.length}</span><span class="l">Invites sent</span></div>
+    <div class="funnel-step"><span class="n">${fu}</span><span class="l">Follow-ups sent</span></div>
+    <div class="funnel-step"><span class="n">${interested.length}</span><span class="l">Interested</span></div>
+    <div class="funnel-step"><span class="n">${noreply.length}</span><span class="l">No reply</span></div>
+    <div class="funnel-step"><span class="n">${notint.length}</span><span class="l">Not interested</span></div>
+  </div>`;
 }
 
 async function patchLead(id, patch, btn) {
@@ -955,7 +972,7 @@ function init() {
   $("btn-reminders").addEventListener("click", enableReminders);
   document.querySelectorAll(".side-sub, .otoggle").forEach((b) => b.addEventListener("click", () => { switchView("outreach"); switchOSub(b.dataset.osub); }));
   $("btn-open-outreach").addEventListener("click", () => { switchView("outreach"); switchOSub("overview"); });
-  $("btn-open-sent").addEventListener("click", () => { switchView("outreach"); switchOSub("sent"); });
+  $("btn-open-alreadysent").addEventListener("click", () => { switchView("outreach"); switchOSub("alreadysent"); });
   $("attention").addEventListener("click", (ev) => {
     const li = ev.target.closest("[data-goto]");
     if (li) { switchView("outreach"); switchOSub(li.dataset.goto); }

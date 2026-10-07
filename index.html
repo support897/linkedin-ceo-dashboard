@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
     <button class="side-sub" data-osub="chats" type="button">Chats</button>
     <button class="side-sub" data-osub="templates" type="button">Templates</button>
     <button class="side-sub" data-osub="safety" type="button">Safety</button>
-    <button class="side-sub" data-osub="sent" type="button">Already sent</button>
+    <button class="side-sub" data-osub="alreadysent" type="button">Already sent</button>
   </div>
 </aside>
 
@@ -84,10 +84,10 @@
       <button class="btn btn-small" id="btn-open-outreach" type="button">Open Outreach</button>
     </div>
 
-    <div class="card card-mint" id="sent-card">
+    <div class="card card-mint" id="sent-widget">
       <h2>Already sent</h2>
-      <div id="sent-summary"><p class="muted">Loading...</p></div>
-      <button class="btn btn-small" id="btn-open-sent" type="button">Open Already sent</button>
+      <div id="sent-glance"><p class="muted">Loading...</p></div>
+      <button class="btn btn-small" id="btn-open-alreadysent" type="button">Open records</button>
     </div>
 
     <div class="card card-rose" id="this-week-card">
@@ -189,7 +189,7 @@
       <button class="toggle otoggle" data-osub="chats" type="button">Chats</button>
       <button class="toggle otoggle" data-osub="templates" type="button">Templates</button>
       <button class="toggle otoggle" data-osub="safety" type="button">Safety</button>
-      <button class="toggle otoggle" data-osub="sent" type="button">Already sent</button>
+      <button class="toggle otoggle" data-osub="alreadysent" type="button">Already sent</button>
     </div>
 
     <div class="osub active" id="osub-overview">
@@ -279,16 +279,12 @@
       </div>
     </div>
 
-    <div class="osub" id="osub-sent" hidden>
+    <div class="osub" id="osub-alreadysent" hidden>
       <div class="card card-blue">
-        <h2>Already sent</h2>
-        <p class="muted">Every invite that has gone out, which follow-up each person is up to, and where they landed.</p>
-        <div class="funnel" id="sent-funnel"></div>
+        <h2>Already sent <span class="count-pill" id="alreadysent-count">0</span></h2>
+        <p class="muted">Every invite sent and which follow-up each person got, grouped by how they answered.</p>
       </div>
-      <div class="card">
-        <h2>All invites sent</h2>
-        <div id="sent-list"><p class="muted">Loading...</p></div>
-      </div>
+      <div id="alreadysent-list"><p class="muted pad">Loading...</p></div>
     </div>
   </section>
 
@@ -320,6 +316,6 @@
   </section>
 </main>
 
-<script src="app.js?v=7"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
