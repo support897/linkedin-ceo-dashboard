@@ -280,3 +280,9 @@ input[type="text"]:focus { outline: 2px solid var(--peri); border-color: var(--p
 }
 .due-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 a.btn { text-decoration: none; display: inline-block; }
+.pipeline { margin-top: 8px; border-top: 1.5px dashed var(--powder); }
+.step { padding: 9px 0 9px 8px; border-bottom: 1px dashed var(--powder); }
+.step:last-child { border-bottom: none; }
+.step.here { box-shadow: inset 3px 0 0 var(--rose); }
+.step-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.step-name { font-weight: 700; font-size: 14px; }
