@@ -292,6 +292,7 @@ async function logConversation() {
 const TERMINAL_STAGES = ["won", "not_now", "closed"];
 const STAGE_LABELS = { new: "New lead", followed: "Followed, warming up", invited: "Invite sent", accepted: "Accepted", msg1_sent: "Message 1 sent", replied: "They replied", chatting: "Chatting", fu1_sent: "Follow-up 1 sent", fu2_sent: "Follow-up 2 sent", call_booked: "Call booked", won: "Won", not_now: "Not now", closed: "Closed" };
 let currentDue = [];
+const openPipes = new Set();
 
 function leadName(l) { return [l.first_name, l.last_name].filter(Boolean).join(" ").trim() || l.business || "Unnamed lead"; }
 function last7Set() { const today = brisDateStr(new Date()); const set = new Set(); for (let i = 0; i < 7; i++) set.add(addDays(today, -i)); return set; }
@@ -316,10 +317,10 @@ function dueItems() {
   const out = [];
   for (const l of D.leads) {
     if (TERMINAL_STAGES.includes(l.stage)) continue;
-    if (l.stage === "replied") out.push({ lead: l, label: "Reply waiting for your answer", action: "Mark answered", patch: { stage: "chatting" }, draft: null });
-    else if (l.accepted_on && !l.msg1_on) out.push({ lead: l, label: "Accepted you. Message 1 is due", action: "Mark message 1 sent", patch: { stage: "msg1_sent", msg1_on: today }, draft: l.draft_msg1 || l.next_message });
-    else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today }, draft: l.draft_fu1 });
-    else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today }, draft: l.draft_fu2 });
+    if (l.stage === "replied") out.push({ lead: l, label: "Reply waiting for your answer", action: "Mark answered", patch: { stage: "chatting" }, draft: null, step: "" });
+    else if (l.accepted_on && !l.msg1_on) out.push({ lead: l, label: "Accepted you. Message 1 is due", action: "Mark message 1 sent", patch: { stage: "msg1_sent", msg1_on: today }, draft: l.draft_msg1 || l.next_message, step: "Step 2 of 4" });
+    else if (l.msg1_on && !l.fu1_on && today >= addDays(l.msg1_on, 3)) out.push({ lead: l, label: "Follow-up 1 is due", action: "Mark follow-up 1 sent", patch: { stage: "fu1_sent", fu1_on: today }, draft: l.draft_fu1, step: "Step 3 of 4" });
+    else if (l.fu1_on && !l.fu2_on && l.msg1_on && today >= addDays(l.msg1_on, 8)) out.push({ lead: l, label: "Follow-up 2 is due. The offer one, then stop", action: "Mark follow-up 2 sent", patch: { stage: "fu2_sent", fu2_on: today }, draft: l.draft_fu2, step: "Step 4 of 4" });
   }
   const dueRank = (d) => d.action.includes("answered") ? 0 : d.action.includes("message 1") ? 1 : d.action.includes("follow-up 1") ? 2 : 3;
   out.sort((a, b) => dueRank(a) - dueRank(b));
@@ -372,7 +373,7 @@ function dueRow(d, i) {
   const openBtn = l.profile_url ? `<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>` : "";
   return `<div class="due-row">
     <p class="waiting-who">${esc(leadName(l))}</p>
-    <p class="waiting-when">${esc(l.business || l.segment || "")} &middot; ${esc(d.label)}</p>
+    <p class="waiting-when">${esc(l.business || l.segment || "")}${d.step ? ` &middot; ${esc(d.step)}` : ""} &middot; ${esc(d.label)}</p>
     ${msg}
     <div class="due-actions">${copyBtn}${openBtn}<button class="btn btn-small" type="button" data-due="${i}">${esc(d.action)}</button></div>
   </div>`;
@@ -438,6 +439,10 @@ function pipeHtml(l) {
     { n: 3, name: "Follow-up 1 \u00b7 day 3-4", field: "draft_fu1", text: l.draft_fu1, done: !!l.fu1_on, doneOn: l.fu1_on, here: !!l.msg1_on && !l.fu1_on, wait: "" },
     { n: 4, name: "Follow-up 2 \u00b7 day 8-10", field: "draft_fu2", text: l.draft_fu2, done: !!l.fu2_on, doneOn: l.fu2_on, here: !!l.fu1_on && !l.fu2_on, wait: "" },
   ].filter((x) => x.text);
+  const s1 = steps.find((x) => x.n === 1);
+  if (s1 && !l.invite_sent_on) s1.mark = `<button class="btn btn-small btn-primary" type="button" data-mark="invite:${l.id}">Mark invite sent</button>`;
+  const s2 = steps.find((x) => x.n === 2);
+  if (s2 && l.invite_sent_on && !l.accepted_on) s2.mark = `<button class="btn btn-small btn-primary" type="button" data-mark="accept:${l.id}">Mark accepted</button>`;
   if (!steps.length) return "";
   const rows = steps.map((x) => {
     const state = x.done ? `<span class="chip chip-sent">Sent ${esc(fmtDate(x.doneOn))}</span>`
@@ -446,10 +451,10 @@ function pipeHtml(l) {
     return `<div class="step${x.here ? " here" : ""}">
       <div class="step-head"><span class="step-name">${x.n} \u00b7 ${esc(x.name)}</span>${state}</div>
       <p class="due-msg">${esc(x.text)}</p>
-      <button class="btn btn-small" type="button" data-copy-step="${l.id}:${x.field}">Copy this step</button>
+      <div class="due-actions"><button class="btn btn-small" type="button" data-copy-step="${l.id}:${x.field}">Copy this step</button>${x.mark || ""}</div>
     </div>`;
   }).join("");
-  return `<div class="pipeline" id="pipe-${l.id}" hidden>${rows}</div>`;
+  return `<div class="pipeline" id="pipe-${l.id}"${openPipes.has(String(l.id)) ? "" : " hidden"}>${rows}</div>`;
 }
 
 function renderLeads() {
@@ -471,9 +476,11 @@ function renderLeads() {
     const acts = [];
     const nd = nextDraft(l);
     if (nd) acts.push(`<button class="btn btn-small" type="button" data-copy-next="${l.id}">${esc(nd.label)}</button>`);
+    if (!l.invite_sent_on && (l.stage === "new" || l.stage === "followed")) acts.push(`<button class="btn btn-small btn-primary" type="button" data-mark="invite:${l.id}">Mark invite sent</button>`);
+    else if (l.invite_sent_on && !l.accepted_on && !TERMINAL_STAGES.includes(l.stage)) acts.push(`<button class="btn btn-small btn-primary" type="button" data-mark="accept:${l.id}">Mark accepted</button>`);
     if (l.profile_url) acts.push(`<a class="btn btn-small" href="${esc(l.profile_url)}" target="_blank" rel="noopener">Open profile</a>`);
     const pipe = pipeHtml(l);
-    if (pipe) acts.push(`<button class="btn btn-small" type="button" data-pipe="${l.id}">See the 4 drafts</button>`);
+    if (pipe) acts.push(`<button class="btn btn-small" type="button" data-pipe="${l.id}">${openPipes.has(String(l.id)) ? "Hide the drafts" : "See the 4 drafts"}</button>`);
     const link = acts.length ? `<div class="due-actions">${acts.join("")}</div>${pipe}` : "";
     return `<article class="card">
       <p class="person-email" style="cursor:default">${esc(leadName(l))}${typeof l.lead_score === "number" ? ` <span class="count-pill">${l.lead_score}</span>` : ""}</p>
@@ -1025,10 +1032,18 @@ function init() {
   };
   $("due-list").addEventListener("click", dueClick);
   $("leads-list").addEventListener("click", (ev) => {
+    const mb = ev.target.closest("[data-mark]");
+    if (mb) {
+      const [kind, lid] = mb.dataset.mark.split(":");
+      const today = brisDateStr(new Date());
+      const patch = kind === "invite" ? { stage: "invited", invite_sent_on: today } : { stage: "accepted", accepted_on: today };
+      patchLead(Number(lid), patch, mb);
+      return;
+    }
     const pb = ev.target.closest("[data-pipe]");
     if (pb) {
       const box = $("pipe-" + pb.dataset.pipe);
-      if (box) { box.hidden = !box.hidden; pb.textContent = box.hidden ? "See the 4 drafts" : "Hide the drafts"; }
+      if (box) { box.hidden = !box.hidden; if (box.hidden) openPipes.delete(String(pb.dataset.pipe)); else openPipes.add(String(pb.dataset.pipe)); pb.textContent = box.hidden ? "See the 4 drafts" : "Hide the drafts"; }
       return;
     }
     const sb2 = ev.target.closest("[data-copy-step]");
