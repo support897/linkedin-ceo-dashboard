@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Nunito:wght@400;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css?v=8">
+<link rel="stylesheet" href="workers.css?v=1">
 </head>
 <body>
 
@@ -66,6 +67,27 @@
     <button class="side-sub" data-osub="templates" type="button">Templates</button>
     <button class="side-sub" data-osub="safety" type="button">Safety</button>
     <button class="side-sub" data-osub="alreadysent" type="button">Already sent</button>
+  </div>
+  <p class="side-title w-side-gap">Workers</p>
+  <button class="side-item" data-view="worker-content" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="6" width="24" height="36" rx="4" fill="#C8D8E8" stroke="#1A1A2E" stroke-width="2.6"/><path d="M17 15 H29 M17 22 H29" stroke="#1A1A2E" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="33" r="4.6" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="2.2"/></svg>
+    <span>LinkedIn Content</span>
+  </button>
+  <div id="worker-content-subs" class="w-subs" hidden>
+    <button class="w-sub active" data-wsub="content:overview" type="button">Overview</button>
+    <button class="w-sub" data-wsub="content:research" type="button">Research</button>
+    <button class="w-sub" data-wsub="content:experiments" type="button">Experiments</button>
+    <button class="w-sub" data-wsub="content:week" type="button">This Week</button>
+  </div>
+  <button class="side-item" data-view="worker-outreach" type="button">
+    <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="#CCECE4" stroke="#1A1A2E" stroke-width="2.6"/><circle cx="24" cy="24" r="10.5" fill="#FFFEFA" stroke="#1A1A2E" stroke-width="2.4"/><circle cx="24" cy="24" r="4.5" fill="#E8A8A8" stroke="#1A1A2E" stroke-width="2"/></svg>
+    <span>LinkedIn Outreach</span>
+  </button>
+  <div id="worker-outreach-subs" class="w-subs" hidden>
+    <button class="w-sub active" data-wsub="outreach:overview" type="button">Overview</button>
+    <button class="w-sub" data-wsub="outreach:research" type="button">Research</button>
+    <button class="w-sub" data-wsub="outreach:experiments" type="button">Experiments</button>
+    <button class="w-sub" data-wsub="outreach:week" type="button">This Week</button>
   </div>
 </aside>
 
@@ -126,6 +148,21 @@
       <p class="muted">Get the Wednesday summary, the Friday freebie alert, and a nudge if something breaks. Nothing else, ever.</p>
       <button class="btn btn-primary" id="btn-reminders" type="button">Turn on reminders</button>
       <p class="fineprint" id="reminder-status"></p>
+    </div>
+
+    <div class="card" id="workers-card">
+      <h2>Workers</h2>
+      <div id="workers-strip"><p class="muted">Loading...</p></div>
+      <p class="fineprint" id="supervisor-line"></p>
+    </div>
+
+    <div class="card card-blue" id="apps-card">
+      <h2>Your other apps</h2>
+      <p class="muted">Each world has its own app, with its own numbers. Nothing crosses over but counts.</p>
+      <div class="w-apps">
+        <a class="btn btn-small" href="https://apex-ceo-dashboard-vtr1.vercel.app" target="_blank" rel="noopener">Apex CEO Dashboard</a>
+        <span class="btn btn-small w-btn-off" aria-disabled="true">Personal Brand app: being built</span>
+      </div>
     </div>
   </section>
 
@@ -314,8 +351,100 @@
       <div id="used-shelf" class="shelf"><p class="muted">Loading...</p></div>
     </div>
   </section>
+
+  <!-- WORKER: LINKEDIN CONTENT -->
+  <section id="view-worker-content" class="view" hidden>
+    <div class="subbar" role="group" aria-label="LinkedIn Content sections">
+      <button class="toggle w-toggle active" data-wsub="content:overview" type="button">Overview</button>
+      <button class="toggle w-toggle" data-wsub="content:research" type="button">Research</button>
+      <button class="toggle w-toggle" data-wsub="content:experiments" type="button">Experiments</button>
+      <button class="toggle w-toggle" data-wsub="content:week" type="button">This Week</button>
+    </div>
+
+    <div class="wsub-panel active" id="wsub-content-overview">
+      <div class="card card-rose">
+        <h2>LinkedIn Content</h2>
+        <div id="wc-status"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card card-mint">
+        <h2>Freebie campaign</h2>
+        <div id="wc-campaign"><p class="muted">Loading...</p></div>
+        <p class="fineprint">This worker announces each week's freebie: one name, one keyword, one live date for LinkedIn, Instagram and Facebook. Comment the keyword and the DM carries the link.</p>
+      </div>
+      <div class="card">
+        <h2>Latest deliverable</h2>
+        <div id="wc-latest"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card card-blue">
+        <h2>Worker brain</h2>
+        <div id="wc-repo"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-content-research" hidden>
+      <div class="card card-blue">
+        <h2>Latest research finding</h2>
+        <div id="wc-research"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-content-experiments" hidden>
+      <div id="wc-experiments"><p class="muted pad">Loading...</p></div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-content-week" hidden>
+      <div class="card card-mint">
+        <h2>This week's roll-up</h2>
+        <div id="wc-week"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKER: LINKEDIN OUTREACH -->
+  <section id="view-worker-outreach" class="view" hidden>
+    <div class="subbar" role="group" aria-label="LinkedIn Outreach sections">
+      <button class="toggle w-toggle active" data-wsub="outreach:overview" type="button">Overview</button>
+      <button class="toggle w-toggle" data-wsub="outreach:research" type="button">Research</button>
+      <button class="toggle w-toggle" data-wsub="outreach:experiments" type="button">Experiments</button>
+      <button class="toggle w-toggle" data-wsub="outreach:week" type="button">This Week</button>
+    </div>
+
+    <div class="wsub-panel active" id="wsub-outreach-overview">
+      <div class="card card-rose">
+        <h2>LinkedIn Outreach</h2>
+        <div id="wo-status"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card">
+        <h2>Latest deliverable</h2>
+        <div id="wo-latest"><p class="muted">Loading...</p></div>
+      </div>
+      <div class="card card-blue">
+        <h2>Worker brain</h2>
+        <div id="wo-repo"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-outreach-research" hidden>
+      <div class="card card-blue">
+        <h2>Latest research finding</h2>
+        <div id="wo-research"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-outreach-experiments" hidden>
+      <div id="wo-experiments"><p class="muted pad">Loading...</p></div>
+    </div>
+
+    <div class="wsub-panel" id="wsub-outreach-week" hidden>
+      <div class="card card-mint">
+        <h2>This week's roll-up</h2>
+        <div id="wo-week"><p class="muted">Loading...</p></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <script src="app.js?v=8"></script>
+<script src="workers.js?v=1"></script>
 </body>
 </html>
