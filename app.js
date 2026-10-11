@@ -294,6 +294,13 @@ const STAGE_LABELS = { new: "New lead", followed: "Followed, warming up", invite
 let currentDue = [];
 const openPipes = new Set();
 
+// Outreach streams: every lead is a customer lead unless tagged partnership.
+// The switch at the top of Outreach filters leads, due, chats and sent lists.
+let outreachStream = "customer";
+function streamOf(l) { return l.stream === "partnership" ? "partnership" : "customer"; }
+function streamLeads() { return D.leads.filter((l) => streamOf(l) === outreachStream); }
+function streamDue() { return currentDue.map((d, i) => ({ d, i })).filter((x) => streamOf(x.d.lead) === outreachStream); }
+
 function leadName(l) { return [l.first_name, l.last_name].filter(Boolean).join(" ").trim() || l.business || "Unnamed lead"; }
 function last7Set() { const today = brisDateStr(new Date()); const set = new Set(); for (let i = 0; i < 7; i++) set.add(addDays(today, -i)); return set; }
 function weekInvites() { const set = last7Set(); return D.leads.filter((l) => l.invite_sent_on && set.has(l.invite_sent_on)); }
@@ -398,21 +405,31 @@ async function copyMsg(text, btn) {
 function renderOutreach() {
   dueItems();
   renderOutreachHome();
-  const { sent, acc } = yesRate();
+  document.querySelectorAll("[data-stream]").forEach((b) => {
+    const s = b.dataset.stream;
+    const n = D.leads.filter((l) => streamOf(l) === s).length;
+    b.classList.toggle("active", s === outreachStream);
+    b.textContent = `${s === "partnership" ? "Partnership" : "Customers"} (${n})`;
+  });
+  const sl = streamLeads();
+  const set7 = last7Set();
+  const sInv = sl.filter((l) => l.invite_sent_on && set7.has(l.invite_sent_on));
+  const sent = sInv.length;
+  const acc = sInv.filter((l) => l.accepted_on).length;
   const st = safetyStatus();
-  const calls = D.leads.filter((l) => l.call_on).length;
-  const chats = D.leads.filter((l) => l.accepted_on).length;
-  $("ov-status").innerHTML = D.leads.length
+  const calls = sl.filter((l) => l.call_on).length;
+  const chats = sl.filter((l) => l.accepted_on).length;
+  $("ov-status").innerHTML = sl.length
     ? `<p class="status-line">${statusChip(st)}<span>${esc(st.why)}</span></p>`
-    : `<p class="muted">No leads yet. Add the first approved batch in Leads.</p>`;
+    : `<p class="muted">No ${outreachStream === "partnership" ? "partnership" : "customer"} leads yet. They land in Leads.</p>`;
   $("ov-funnel").innerHTML = `
     <div class="funnel-step"><span class="n">${sent}</span><span class="l">Invited, last 7 days</span></div>
     <div class="funnel-step"><span class="n">${acc}</span><span class="l">Accepted</span></div>
     <div class="funnel-step"><span class="n">${chats}</span><span class="l">Chats open</span></div>
     <div class="funnel-step"><span class="n">${calls}</span><span class="l">Calls booked</span></div>`;
-  const due = currentDue;
-  $("ov-due").innerHTML = due.length
-    ? due.slice(0, 3).map((d, i) => dueRow(d, i)).join("") + (due.length > 3 ? `<p class="fineprint">Plus ${due.length - 3} more in Due Today.</p>` : "")
+  const sdue = streamDue();
+  $("ov-due").innerHTML = sdue.length
+    ? sdue.slice(0, 3).map((x) => dueRow(x.d, x.i)).join("") + (sdue.length > 3 ? `<p class="fineprint">Plus ${sdue.length - 3} more in Due Today.</p>` : "")
     : `<p class="muted">Nothing due. New accepts and follow-ups land here on their day.</p>`;
   renderLeads();
   renderDue();
@@ -458,13 +475,16 @@ function pipeHtml(l) {
 }
 
 function renderLeads() {
-  $("leads-count").textContent = D.leads.length;
+  const sl = streamLeads();
+  $("leads-count").textContent = sl.length;
   const list = $("leads-list");
-  if (!D.leads.length) {
-    list.innerHTML = `<div class="card"><p class="muted">No leads yet. The first approved batch of 50 lands here, best at the top.</p></div>`;
+  if (!sl.length) {
+    list.innerHTML = outreachStream === "partnership"
+      ? `<div class="card"><p class="muted">No partnership leads yet. The outreach worker adds about 20 a day; they land here, kept apart from customer leads.</p></div>`
+      : `<div class="card"><p class="muted">No customer leads yet. The first approved batch of 50 lands here, best at the top.</p></div>`;
     return;
   }
-  const rows = [...D.leads].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
+  const rows = [...sl].sort((a, b) => (b.lead_score || 0) - (a.lead_score || 0));
   list.innerHTML = rows.map((l) => {
     const chips = [];
     if (l.segment) chips.push(`<span class="chip">${esc(l.segment)}</span>`);
@@ -495,14 +515,15 @@ function renderLeads() {
 
 function renderDue() {
   const list = $("due-list");
-  list.innerHTML = currentDue.length
-    ? `<div class="card">${currentDue.map((d, i) => dueRow(d, i)).join("")}</div>`
+  const sd = streamDue();
+  list.innerHTML = sd.length
+    ? `<div class="card">${sd.map((x) => dueRow(x.d, x.i)).join("")}</div>`
     : `<div class="card"><p class="muted">Nothing due today. Replies, new accepts and follow-ups appear here on their day.</p></div>`;
 }
 
 function renderChats() {
   const list = $("chats-list");
-  const chats = D.leads.filter((l) => l.accepted_on || ["msg1_sent", "replied", "chatting", "fu1_sent", "fu2_sent", "call_booked"].includes(l.stage));
+  const chats = streamLeads().filter((l) => l.accepted_on || ["msg1_sent", "replied", "chatting", "fu1_sent", "fu2_sent", "call_booked"].includes(l.stage));
   if (!chats.length) {
     list.innerHTML = `<div class="card"><p class="muted">No chats yet. Accepted connections appear here with their next step.</p></div>`;
     return;
@@ -582,7 +603,7 @@ function sentGroup(title, leads, emptyText) {
 }
 function renderAlreadySent() {
   const list = $("alreadysent-list");
-  const sent = sentLeads();
+  const sent = sentLeads().filter((l) => streamOf(l) === outreachStream);
   $("alreadysent-count").textContent = sent.length;
   const interested = sent.filter((l) => INTERESTED_STAGES.includes(l.stage));
   const noreply = sent.filter((l) => NOREPLY_STAGES.includes(l.stage));
@@ -651,6 +672,7 @@ async function addLead(ev) {
       lead_score: score, lead_tier: tier,
       problem: $("o-problem").value.trim() || null,
       profile_url: $("o-url").value.trim() || null,
+      stream: outreachStream,
       stage: "new"
     } });
     status.textContent = `Added ${first}. They are in the Leads list.`;
@@ -1012,6 +1034,7 @@ function init() {
   ["fb-name", "fb-keyword"].forEach((id) => $(id).addEventListener("input", () => { $(id).dataset.touched = "1"; }));
   $("btn-reminders").addEventListener("click", enableReminders);
   document.querySelectorAll(".side-sub, .otoggle").forEach((b) => b.addEventListener("click", () => { switchView("outreach"); switchOSub(b.dataset.osub); }));
+  document.querySelectorAll("[data-stream]").forEach((b) => b.addEventListener("click", () => { outreachStream = b.dataset.stream === "partnership" ? "partnership" : "customer"; renderOutreach(); }));
   $("btn-open-outreach").addEventListener("click", () => { switchView("outreach"); switchOSub("overview"); });
   $("btn-open-alreadysent").addEventListener("click", () => { switchView("outreach"); switchOSub("alreadysent"); });
   $("attention").addEventListener("click", (ev) => {
