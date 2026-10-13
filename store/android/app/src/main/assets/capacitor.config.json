@@ -1,0 +1,8 @@
+{
+	"appId": "com.apexwebsitesolutions.linkedinceo",
+	"appName": "LinkedIn CEO Dashboard",
+	"webDir": "www",
+	"server": {
+		"androidScheme": "https"
+	}
+}
