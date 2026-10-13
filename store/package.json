@@ -1,0 +1,21 @@
+{
+  "name": "linkedin-ceo-dashboard-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor store package for the LinkedIn CEO Dashboard web app. The web app itself lives at the repo root; www/ here is a verbatim copy used only as the Capacitor webDir.",
+  "scripts": {
+    "sync": "npx cap sync",
+    "open:android": "npx cap open android",
+    "open:ios": "npx cap open ios",
+    "build:aab": "cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.4.0",
+    "@capacitor/cli": "^7.4.0",
+    "@capacitor/core": "^7.4.0",
+    "@capacitor/ios": "^7.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}
