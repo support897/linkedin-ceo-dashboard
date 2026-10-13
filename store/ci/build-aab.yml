@@ -1,0 +1,66 @@
+name: Build signed AAB (LinkedIn CEO Dashboard)
+
+# Builds the Capacitor Android app in store/ and uploads the signed
+# release AAB as a workflow artifact. Signing material comes from repo
+# secrets (KEYSTORE_B64, KEYSTORE_PASSWORD) and is never printed.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'store/**'
+      - '.github/workflows/build-aab.yml'
+
+jobs:
+  build-aab:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: store
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync web app into Android project
+        run: npx cap sync android
+
+      - name: Decode upload keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "KEYSTORE_B64 secret is not set" >&2; exit 1; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build signed release AAB
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/upload.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: linkedin-ceo-upload
+          KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon
+
+      - name: Verify signature
+        run: |
+          cd android
+          AAB=$(ls app/build/outputs/bundle/release/*.aab | head -1)
+          echo "Built: $AAB"
+          "$JAVA_HOME/bin/jarsigner" -verify "$AAB" | head -3
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linkedin-ceo-dashboard-aab
+          path: store/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
