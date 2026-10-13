@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LinkedIn CEO Dashboard</string>
+    <string name="title_activity_main">LinkedIn CEO Dashboard</string>
+    <string name="package_name">com.apexwebsitesolutions.linkedinceo</string>
+    <string name="custom_url_scheme">com.apexwebsitesolutions.linkedinceo</string>
+</resources>
