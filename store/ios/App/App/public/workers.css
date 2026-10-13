@@ -1,0 +1,52 @@
+/* Workers tracking (additive module, 2026-10-10).
+   New classes only, prefixed w-. styles.css is untouched; where a worker
+   element can reuse an existing class (.card, .chip, .btn, .toggle,
+   .subbar, .side-title, .muted, .fineprint) it does. */
+
+/* Sidebar: second section heading + worker sub-menus.
+   (.w-sub mirrors .side-sub's look without using its class, because
+   app.js binds .side-sub clicks to the Outreach view.) */
+.w-side-gap { margin-top: 16px; }
+.w-subs { margin: 2px 0 8px 20px; border-left: 2px dashed var(--powder); padding-left: 8px; }
+.w-subs[hidden] { display: none; }
+.w-sub {
+  display: flex; align-items: center; width: 100%; min-height: 44px;
+  padding: 8px 12px; margin-bottom: 4px; background: none;
+  border: 2px solid transparent; border-radius: 999px;
+  font-family: "Quicksand", sans-serif; font-weight: 700; font-size: 14.5px;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+.w-sub:active { transform: scale(.98); }
+.w-sub.active { background: var(--tint-blue); border-color: var(--peri); }
+
+/* Worker sub-panels (mirror .osub behaviour) */
+.wsub-panel { display: none; }
+.wsub-panel.active { display: block; }
+
+/* Status dot */
+.w-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 2px solid var(--ink); display: inline-block; flex: 0 0 auto;
+}
+.w-dot-on { background: var(--mint-deep); }
+.w-dot-stale { background: var(--honey); }
+.w-dot-off { background: var(--powder); }
+
+/* Home workers strip */
+.w-strip-item { padding: 10px 0; border-bottom: 1.5px dashed var(--powder); }
+.w-strip-item:last-child { border-bottom: none; padding-bottom: 2px; }
+.w-strip-head { display: flex; align-items: center; gap: 9px; }
+.w-strip-name { font-weight: 800; font-size: 15.5px; }
+.w-strip-line { font-size: 13.5px; color: rgba(26,26,46,.66); line-height: 1.45; margin: 3px 0 7px; }
+
+/* Cross-app links row */
+.w-apps { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.w-btn-off { background: #fff; opacity: .55; cursor: default; }
+
+/* Worker page bits */
+.w-finding { font-size: 15.5px; font-weight: 800; line-height: 1.4; }
+.w-kv { font-size: 14px; line-height: 1.5; margin-top: 6px; }
+.w-kv strong { font-family: "Quicksand", sans-serif; }
+.w-verdict-pass { background: var(--mint); }
+.w-verdict-fail { background: var(--rose); border: 1.5px solid var(--ink); padding: 1.5px 9px; }
+.w-verdict-open { background: var(--tint-honey); border: 1.5px solid var(--honey); padding: 1.5px 9px; }
