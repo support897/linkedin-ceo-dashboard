@@ -81,8 +81,30 @@ async function loadAll() {
   });
   if (okCount === 0) throw new Error("Could not load any dashboard data.");
   rebuildLatestStats();
-  const t = new Intl.DateTimeFormat("en-AU", { timeZone: TZ, hour: "numeric", minute: "2-digit", weekday: "short", day: "numeric", month: "short" }).format(new Date());
-  $("last-updated").textContent = `Last updated: ${t}`;
+}
+
+// ---- Instant paint: keep the last good snapshot on this device ----
+// The app paints from the on-device snapshot immediately on open, then
+// refreshes quietly in the background. Opening the app feels instant;
+// fresh numbers slide in a moment later.
+const CACHE_KEY = "ceo-dashboard-d-v1";
+function fmtTime(t) {
+  return new Intl.DateTimeFormat("en-AU", { timeZone: TZ, hour: "numeric", minute: "2-digit", weekday: "short", day: "numeric", month: "short" }).format(new Date(t));
+}
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (!snap || typeof snap !== "object" || !snap.D) return null;
+    return snap;
+  } catch (e) { return null; }
+}
+function writeCache() {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), D })); } catch (e) {}
+}
+function renderAll() {
+  renderHome(); renderPosts(); renderFreebies(); renderPeople(); renderPhotos(); renderOutreach();
 }
 
 // ---- Shared measures ----
@@ -935,16 +957,17 @@ function renderPhotos() {
 }
 
 async function loadThumbs() {
-  for (const img of document.querySelectorAll("img[data-path]")) {
+  const imgs = Array.from(document.querySelectorAll("img[data-path]"));
+  await Promise.all(imgs.map(async (img) => {
     try {
       const path = img.dataset.path.split("/").map(encodeURIComponent).join("/");
       const res = await fetch(`${SUPABASE_URL}/storage/v1/object/vault/${path}`, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }
       });
-      if (!res.ok) continue;
+      if (!res.ok) return;
       img.src = URL.createObjectURL(await res.blob());
     } catch (e) { /* the pastel placeholder stays */ }
-  }
+  }));
 }
 
 // ---- REMINDERS (subscription groundwork; sending comes later) ----
@@ -996,17 +1019,35 @@ function switchView(name) {
 
 async function refreshData() {
   const errBox = $("load-error");
+  // 1. Paint instantly from the on-device snapshot, if there is one.
+  const snap = readCache();
+  let painted = false;
+  if (snap) {
+    for (const k of Object.keys(D)) if (Array.isArray(snap.D[k])) D[k] = snap.D[k];
+    rebuildLatestStats();
+    if (errBox) errBox.remove();
+    renderAll();
+    $("last-updated").textContent = `Last updated: ${fmtTime(snap.t)} · refreshing…`;
+    painted = true;
+  }
+  // 2. Fetch fresh data in the background, then paint it.
   try {
     await loadAll();
     if (errBox) errBox.remove();
-    renderHome(); renderPosts(); renderFreebies(); renderPeople(); renderPhotos(); renderOutreach();
+    writeCache();
+    renderAll();
+    $("last-updated").textContent = `Last updated: ${fmtTime(Date.now())}`;
   } catch (e) {
-    $("last-updated").textContent = "Could not load. Pull down to try again.";
-    if (!errBox) {
-      const div = document.createElement("div");
-      div.className = "error-box"; div.id = "load-error";
-      div.textContent = "The dashboard could not load its data. Check your connection, then pull down to refresh.";
-      $("main").prepend(div);
+    if (!painted) {
+      $("last-updated").textContent = "Could not load. Pull down to try again.";
+      if (!errBox) {
+        const div = document.createElement("div");
+        div.className = "error-box"; div.id = "load-error";
+        div.textContent = "The dashboard could not load its data. Check your connection, then pull down to refresh.";
+        $("main").prepend(div);
+      }
+    } else {
+      $("last-updated").textContent = `Last updated: ${fmtTime(snap.t)} · refresh failed`;
     }
   }
 }
